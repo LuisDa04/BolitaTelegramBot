@@ -461,36 +461,34 @@ function canonicalizeCurrency(currency) {
 
 
 async function setExchangeRateUSD(rate) {
-    await supabase
+    const { error } = await supabase
         .from('exchange_rate')
-        .update({ rate, updated_at: new Date() })
-        .eq('id', 1);
+        .upsert({ id: 1, rate, updated_at: new Date() }, { onConflict: 'id' });
+    if (error) console.error('[Tasas] Error guardando USD:', error.message);
 }
 
 async function setExchangeRateUSDT(rate) {
-    await supabase
+    const { error } = await supabase
         .from('exchange_rate')
-        .update({ rate_usdt: rate, updated_at: new Date() })
-        .eq('id', 1);
+        .upsert({ id: 1, rate_usdt: rate, updated_at: new Date() }, { onConflict: 'id' });
+    if (error) console.error('[Tasas] Error guardando USDT:', error.message);
 }
 
 async function setExchangeRateTRX(rate) {
-    await supabase
+    const { error } = await supabase
         .from('exchange_rate')
-        .update({ rate_trx: rate, updated_at: new Date() })
-        .eq('id', 1);
+        .upsert({ id: 1, rate_trx: rate, updated_at: new Date() }, { onConflict: 'id' });
+    if (error) console.error('[Tasas] Error guardando TRX:', error.message);
 }
 
 async function setExchangeRateMLC(rate) {
     const { error } = await supabase
         .from('exchange_rate')
-        .update({ rate_mlc: rate, updated_at: new Date() })
-        .eq('id', 1);
-
+        .upsert({ id: 1, rate_mlc: rate, updated_at: new Date() }, { onConflict: 'id' });
     if (error) {
+        console.error('[Tasas] Error guardando MLC:', error.message);
         return { ok: false, error };
     }
-
     return { ok: true };
 }
 
@@ -5941,15 +5939,45 @@ cron.schedule('30 8 * * *', async () => {
         const dateStr = now.format('DD/MM/YYYY');
         const timeStr = now.format('h:mm A');
 
-        // Primero intentar desde eltoque.com, fallback a Telegram @eltoquecom
-        let rates = await fetchElToqueRates();
-        let usedFallback = false;
-        if (!rates || (rates.usd == null && rates.mlc == null && rates.usdt == null && rates.trx == null)) {
-            console.log('[Tasas] ElToque falló, intentando Telegram @eltoquecom...');
-            rates = await fetchTelegramRates();
-            usedFallback = true;
+        // 1) Telegram primero → MLC y USD
+        let telegramRates = null;
+        try {
+            telegramRates = await fetchTelegramRates();
+        } catch (e) {
+            console.error('[Tasas] Telegram fetch error:', e.message);
         }
-        const fetchOk = rates && (rates.usd != null || rates.mlc != null || rates.usdt != null || rates.trx != null);
+
+        // 2) ElToque → TRX y USDT (+ MLC/USD como fallback si Telegram falló)
+        let elToqueRates = null;
+        try {
+            elToqueRates = await fetchElToqueRates();
+        } catch (e) {
+            console.error('[Tasas] ElToque fetch error:', e.message);
+        }
+
+        // Combinar: Telegram para MLC/USD, ElToque para TRX/USDT
+        const rates = {};
+        // MLC y USD: preferir Telegram, fallback ElToque
+        if (telegramRates && (telegramRates.usd != null || telegramRates.mlc != null)) {
+            rates.usd = telegramRates.usd;
+            rates.mlc = telegramRates.mlc;
+            console.log('[Tasas] USD y MLC obtenidos de Telegram @eltoquecom');
+        } else if (elToqueRates) {
+            rates.usd = elToqueRates.usd;
+            rates.mlc = elToqueRates.mlc;
+            console.log('[Tasas] Telegram falló, USD y MLC obtenidos de ElToque');
+        } else {
+            console.log('[Tasas] No se pudieron obtener USD ni MLC');
+        }
+        // TRX y USDT: siempre de ElToque
+        if (elToqueRates) {
+            rates.usdt = elToqueRates.usdt;
+            rates.trx = elToqueRates.trx;
+            console.log('[Tasas] USDT y TRX obtenidos de ElToque');
+        } else {
+            console.log('[Tasas] No se pudieron obtener USDT y TRX (ElToque falló)');
+        }
+        const fetchOk = rates.usd != null || rates.mlc != null || rates.usdt != null || rates.trx != null;
 
         if (fetchOk) {
             // Actualizar solo las tasas que se obtuvieron correctamente
@@ -5973,7 +6001,7 @@ cron.schedule('30 8 * * *', async () => {
         const lines = [
             '💹 Tasas de Cambio del Día',
             `🕐 ${fetchOk ? 'Actualizado en tiempo real' : 'Últimas tasas disponibles'}: ${dateStr} ${timeStr}`,
-            'Fuente: eltoque.com',
+            'Fuente: Telegram @eltoquecom / eltoque.com',
             '',
             'Mercado Informal',
         ];
