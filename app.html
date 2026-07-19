@@ -1143,7 +1143,12 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 }
             }
             if (cupExceeders.length > 0 || usdExceeders.length > 0) {
-                const allNums = [...new Set([...cupExceeders, ...usdExceeders])];
+                const allNums = [...new Set([...cupExceeders, ...usdExceeders])].sort((a, b) => {
+                    const na = parseInt(a, 10);
+                    const nb = parseInt(b, 10);
+                    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                    return a.localeCompare(b);
+                });
                 const isPlural = allNums.length > 1;
                 let label;
                 if (isPlural) {
