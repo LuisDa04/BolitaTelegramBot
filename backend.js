@@ -306,8 +306,7 @@ async function setExchangeRateUSD(rate) {
 async function setExchangeRateMLC(rate) {
     const { error } = await supabase
         .from('exchange_rate')
-        .update({ rate_mlc: rate, updated_at: new Date() })
-        .eq('id', 1);
+        .upsert({ id: 1, rate_mlc: rate, updated_at: new Date() }, { onConflict: 'id' });
 
     if (error) {
         return { ok: false, error };
