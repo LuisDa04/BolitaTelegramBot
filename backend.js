@@ -4209,7 +4209,7 @@ app.post('/api/admin/users/:telegramId/ban', async (req, res) => {
             const referrerId = bannedUser.ref_by;
             const userName = bannedUser.first_name || bannedUser.username || 'Usuario';
             bot.telegram.sendMessage(referrerId,
-                `⚠️ Tu referido ${escapeHTML(userName)} acaba de ser baneado.`,
+                `⚠️ Tu referido ${escapeHTML(userName)} acaba de ser baneado. Lo sentimos, en su condición no podrá enviarte referencias.`,
                 { parse_mode: 'HTML' }
             ).catch(e => console.error('Error notificando al referidor:', e));
         }
@@ -4269,7 +4269,7 @@ app.post('/api/admin/users/:telegramId/unban', async (req, res) => {
             const referrerId = userBefore.ref_by;
             const userName = userBefore.first_name || userBefore.username || 'Usuario';
             bot.telegram.sendMessage(referrerId,
-                `ℹ️ Tu referido ${escapeHTML(userName)} acaba de ser desbaneado.`,
+                `ℹ️ Tu referido ${escapeHTML(userName)} acaba de ser desbaneado. Ya podrá enviarte sus referencias.`,
                 { parse_mode: 'HTML' }
             ).catch(e => console.error('Error notificando al referidor:', e));
         }
@@ -4457,6 +4457,18 @@ app.post('/api/admin/users/:telegramId/reset', async (req, res) => {
                     }
                 } catch (e) {
                     console.error('Error al procesar deducción por referido eliminado:', e);
+                }
+            })();
+        } else if (userRefBy) {
+            (async () => {
+                try {
+                    const userName = userFirstName || userUsername || 'Usuario';
+                    await bot.telegram.sendMessage(userRefBy,
+                        `⚠️ Tu referido ${escapeHTML(userName)} acaba de ser eliminado. Lo sentimos, ya no podrá enviarte referencias.`,
+                        { parse_mode: 'HTML' }
+                    ).catch(e => console.error('Error notificando al referidor:', e));
+                } catch (e) {
+                    console.error('Error notificando eliminación sin jugadas:', e);
                 }
             })();
         }
