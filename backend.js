@@ -3772,7 +3772,7 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
 
     const formattedBroadcast = cleanNumber.replace(/(\d{3})(\d{4})/, '$1 $2');
     await broadcastToAllUsers(
-        `📢 <b>NÚMERO GANADOR PUBLICADO</b>\n\n` +
+        `📢 <b>NÚMERO GANADOR PUBLICADO - La Bolita Cubana 🇨🇺</b>\n\n` +
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${session.lottery}</b> - Turno <b>${session.time_slot}</b>\n` +
         `📅 Fecha: ${session.date}\n` +
         `🔢 Número: <code>${formattedBroadcast}</code>\n\n` +
