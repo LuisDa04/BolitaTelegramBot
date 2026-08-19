@@ -319,6 +319,45 @@
             cursor: not-allowed !important;
             opacity: 0.7;
         }
+        /* Switch "Publicación automática" (barra con bolita deslizante) */
+        .auto-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        .auto-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .auto-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #4b5563;
+            border-radius: 9999px;
+            transition: background 0.3s;
+        }
+        .auto-slider::before {
+            content: '';
+            position: absolute;
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            top: 3px;
+            background: #ffffff;
+            border-radius: 9999px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .auto-switch input:checked + .auto-slider {
+            background: #14b8a6;
+        }
+        .auto-switch input:checked + .auto-slider::before {
+            transform: translateX(24px);
+        }
     </style>
 </head>
 <body class="p-4 md:p-6">
@@ -604,6 +643,18 @@
         <div class="flex gap-3">
             <button onclick="cancelDiscard()" class="flex-1 bg-gray-600 py-2 rounded-lg">No</button>
             <button onclick="confirmDiscard()" class="flex-1 bg-red-600 py-2 rounded-lg">Sí, descartar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL para confirmar recorte al máximo permitido (números repetidos) -->
+<div id="limitOverrideModal" class="modal hidden" onclick="if(event.target===this) this.classList.add('hidden')">
+    <div class="modal-content" style="padding-top:22px;">
+        <h3 class="text-lg font-bold text-white mb-4">4pu3$t4$ Qva®</h3>
+        <p id="limitOverrideText" class="text-sm text-gray-300 mt-4 mb-6" style="line-height:1.4"></p>
+        <div class="flex gap-3">
+            <button id="limitOverrideRejectBtn" onclick="rejectLimitOverride()" class="flex-1 bg-red-600 py-2 rounded-lg">❌ No, omitirlo(s)</button>
+            <button onclick="acceptLimitOverride()" class="flex-1 bg-green-600 py-2 rounded-lg">✅ Sí, apostar</button>
         </div>
     </div>
 </div>
@@ -1111,16 +1162,25 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             return [match[1], match[2]].sort().join('x');
         }
 
+        // Une una lista de números con "y" antes del último
+        function joinListWithY(list) {
+            const items = list.map(String);
+            if (items.length <= 1) return items.join('');
+            const allButLast = items.slice(0, -1).join(', ');
+            return `${allButLast} y ${items[items.length - 1]}`;
+        }
+
         // ========== VALIDACIÓN DE LÍMITES ACUMULADOS POR NÚMERO ==========
         function validateBetLimits(items, betType, priceData) {
             const maxCup = priceData?.max_cup;
             const maxUsd = priceData?.max_usd;
             if (maxCup === null && maxUsd === null) return { ok: true };
 
-            const typeLabel = betType === 'fijo' ? 'número' : formatBetTypeLabel(betType).toLowerCase();
+            const typeLabel = (betType === 'fijo' || betType === 'corridos') ? 'número' : formatBetTypeLabel(betType).toLowerCase();
             const article = betType === 'centena' ? 'La' : 'El';
 
             const grouped = {};
+            const repeated = {};
             for (const item of items) {
                 const num = betType === 'parle'
                     ? (normalizeParleValue(item.numero) || item.numero)
@@ -1130,6 +1190,30 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 if (!grouped[num]) grouped[num] = { cup: 0, usd: 0 };
                 grouped[num].cup += cup;
                 grouped[num].usd += usd;
+                repeated[num] = (repeated[num] || 0) + 1;
+            }
+
+            // Totales ya apostados por el mismo usuario en la misma sesión/tipo,
+            // excluyendo la jugada que se está editando (igual criterio que el servidor).
+            const existingTotals = {};
+            const activeSessionId = activeSession?.id;
+            for (const bet of (userBets || [])) {
+                if (bet.id === window.editingBetId) continue;
+                if (activeSessionId && String(bet.session_id) !== String(activeSessionId)) continue;
+                if (bet.bet_type !== betType) continue;
+                for (const item of (bet.items || [])) {
+                    const num = betType === 'parle'
+                        ? (normalizeParleValue(item.numero) || item.numero)
+                        : item.numero;
+                    const cup = item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount) : 0);
+                    const usd = item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount) : 0);
+                    if (!existingTotals[num]) existingTotals[num] = { cup: 0, usd: 0 };
+                    existingTotals[num].cup += cup;
+                    existingTotals[num].usd += usd;
+                    if (!grouped[num]) grouped[num] = { cup: 0, usd: 0 };
+                    grouped[num].cup += cup;
+                    grouped[num].usd += usd;
+                }
             }
 
             const cupExceeders = [];
@@ -1162,7 +1246,16 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 const maxParts = [];
                 if (cupExceeders.length > 0) maxParts.push(`${parseFloat(maxCup).toFixed(2)} CUP`);
                 if (usdExceeders.length > 0) maxParts.push(`${parseFloat(maxUsd).toFixed(2)} USD`);
-                return { ok: false, error: `❌ ${label} ${allNums.join(', ')} ${verb} el monto máximo de apuesta permitido de ${maxParts.join(' y ')}.` };
+                // Se ofrece "apostar hasta el máximo" si al menos un número excedido
+                // aún no está al máximo por jugadas anteriores (igual criterio que el servidor).
+                const alreadyMaxed = (num) => {
+                    const ex = existingTotals[num] || { cup: 0, usd: 0 };
+                    const cupRoom = cupExceeders.includes(num) && maxCup !== null && (ex.cup || 0) < parseFloat(maxCup);
+                    const usdRoom = usdExceeders.includes(num) && maxUsd !== null && (ex.usd || 0) < parseFloat(maxUsd);
+                    return !(cupRoom || usdRoom);
+                };
+                const confirmable = allNums.length > 0 && allNums.some(n => !alreadyMaxed(n));
+                return { ok: false, error: `❌ ${label} ${joinListWithY(allNums)} ${verb} el monto máximo de apuesta permitido de ${maxParts.join(' y ')}.`, confirmable };
             }
             return { ok: true };
         }
@@ -1257,6 +1350,92 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             };
         }
 
+        // Convierte los items finales de una jugada (tras omitir/recortar) de vuelta
+        // a texto jugada, para que el raw_text refleje exactamente lo jugado.
+        function serializeItemsToText(items, betType) {
+            const cupOf = (item) => item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount) : 0);
+            const usdOf = (item) => item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount) : 0);
+            const fmtAmount = (v) => {
+                const x = Math.round(v * 100) / 100;
+                return Number.isInteger(x) ? String(x) : x.toFixed(2);
+            };
+
+            const lines = [];
+            const cupItems = items.filter(it => cupOf(it) > 0);
+            const usdItems = items.filter(it => usdOf(it) > 0);
+            if (cupItems.length > 0) {
+                const byAmount = {};
+                for (const it of cupItems) {
+                    const a = Math.round(cupOf(it) * 100) / 100;
+                    if (!byAmount[a]) byAmount[a] = [];
+                    byAmount[a].push(String(it.numero));
+                }
+                for (const a of Object.keys(byAmount).sort((x, y) => parseFloat(x) - parseFloat(y))) {
+                    lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} cup`);
+                }
+            }
+            if (usdItems.length > 0) {
+                const byAmount = {};
+                for (const it of usdItems) {
+                    const a = Math.round(usdOf(it) * 100) / 100;
+                    if (!byAmount[a]) byAmount[a] = [];
+                    byAmount[a].push(String(it.numero));
+                }
+                for (const a of Object.keys(byAmount).sort((x, y) => parseFloat(x) - parseFloat(y))) {
+                    lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} usd`);
+                }
+            }
+            return lines.join('\n');
+        }
+
+        function betNumOf(item, betType) {
+            return betType === 'parle' ? (normalizeParleValue(item.numero) || item.numero) : item.numero;
+        }
+        function betCupOf(item) {
+            return item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount) : 0);
+        }
+        function betUsdOf(item) {
+            return item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount) : 0);
+        }
+        function betTotalsByNum(items, betType) {
+            const totals = {};
+            for (const it of (items || [])) {
+                const num = betNumOf(it, betType);
+                if (!totals[num]) totals[num] = { cup: 0, usd: 0 };
+                totals[num].cup += betCupOf(it);
+                totals[num].usd += betUsdOf(it);
+            }
+            return totals;
+        }
+        function betTotalsEqual(a, b) {
+            const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+            for (const k of keys) {
+                const ca = Math.round((a[k]?.cup || 0) * 100);
+                const ua = Math.round((a[k]?.usd || 0) * 100);
+                const cb = Math.round((b[k]?.cup || 0) * 100);
+                const ub = Math.round((b[k]?.usd || 0) * 100);
+                if (ca !== cb || ua !== ub) return false;
+            }
+            return true;
+        }
+        // Texto para el editor al editar: usa el raw_text si representa fielmente
+        // lo jugado; si no (números omitidos/recortados en guardados antiguos),
+        // regenera desde los items reales para que no reaparezcan descartados.
+        function buildEditPrefill(bet) {
+            try {
+                const parsed = parseBetMessage(String(bet.raw_text || ''), bet.bet_type);
+                const parsedTotals = betTotalsByNum(parsed.ok ? parsed.items : [], bet.bet_type);
+                const itemsTotals = betTotalsByNum(bet.items, bet.bet_type);
+                if (betTotalsEqual(parsedTotals, itemsTotals)) {
+                    return String(bet.raw_text || '');
+                }
+                return serializeItemsToText(bet.items, bet.bet_type);
+            } catch (e) {
+                console.error(e);
+                return String(bet.raw_text || '');
+            }
+        }
+
         betInput.addEventListener('input', function() {
             if (!selectedBetType) return;
             const rawText = this.value;
@@ -1306,7 +1485,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
             // Validar máximos acumulados por número único
             const limitCheck = validateBetLimits(parsed.items, selectedBetType, price);
-            if (!limitCheck.ok) {
+            if (!limitCheck.ok && !limitCheck.confirmable) {
                 iziToast.error({ message: limitCheck.error });
                 return;
             }
@@ -1327,24 +1506,89 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 }
             }
 
+            const payload = {
+                userId: currentUser.telegram_id,
+                lottery: selectedLottery,
+                betType: selectedBetType,
+                bet_type: selectedBetType,
+                rawText,
+                sessionId: activeSession.id
+            };
+            if (window.editingBetId) {
+                payload.betId = window.editingBetId;
+            }
+            sendBetRequest(payload);
+        });
+
+        let pendingBetPayload = null;
+
+        function limitOverrideAdmissible(exceedData) {
+            const parts = [];
+            let isSingleOne = false;
+            if (exceedData && exceedData.admissibleCup > 0) {
+                parts.push(`${exceedData.admissibleCup.toFixed(2)} CUP`);
+                isSingleOne = !(exceedData.admissibleUsd > 0) && exceedData.admissibleCup === 1;
+            }
+            if (exceedData && exceedData.admissibleUsd > 0) {
+                parts.push(`${exceedData.admissibleUsd.toFixed(2)} USD`);
+                isSingleOne = isSingleOne || (!(exceedData.admissibleCup > 0) && exceedData.admissibleUsd === 1);
+            }
+            return { text: parts.join(' y '), isSingleOne };
+        }
+
+        function showLimitOverrideModal(errorText, exceedData) {
+            const textEl = document.getElementById('limitOverrideText');
+            const rejectBtn = document.getElementById('limitOverrideRejectBtn');
+            if (rejectBtn) {
+                rejectBtn.innerHTML = selectedBetType === 'centena' ? '❌ No, omitirla(s)' : '❌ No, omitirlo(s)';
+            }
+            if (textEl) {
+                let admissibleHtml = '';
+                let isSingleOne = false;
+                if (exceedData && Array.isArray(exceedData.admissibleLines) && exceedData.admissibleLines.length > 0) {
+                    admissibleHtml = exceedData.admissibleLines.join('<br>');
+                    isSingleOne = ((exceedData.admissibleCup || 0) > 0 && !(exceedData.admissibleUsd > 0) && exceedData.admissibleCup === 1)
+                        || ((exceedData.admissibleUsd || 0) > 0 && !(exceedData.admissibleCup > 0) && exceedData.admissibleUsd === 1);
+                } else {
+                    const { text, isSingleOne: iso } = limitOverrideAdmissible(exceedData);
+                    admissibleHtml = text;
+                    isSingleOne = iso;
+                }
+                const question = isSingleOne ? '¿Desea apostárselo?' : '¿Deseas apostárselos?';
+                const admissibleLine = admissibleHtml ? `<br><br>${admissibleHtml}` : '';
+                textEl.innerHTML = `${errorText}${admissibleLine}<br>${question}`;
+            }
+            document.getElementById('limitOverrideModal').classList.remove('hidden');
+        }
+
+        function acceptLimitOverride() {
+            document.getElementById('limitOverrideModal').classList.add('hidden');
+            const payload = pendingBetPayload;
+            pendingBetPayload = null;
+            if (!payload) return;
+            payload.confirmLimitOverride = true;
+            sendBetRequest(payload);
+        }
+
+        function rejectLimitOverride() {
+            document.getElementById('limitOverrideModal').classList.add('hidden');
+            const payload = pendingBetPayload;
+            pendingBetPayload = null;
+            if (!payload) return;
+            payload.omitLimitOverride = true;
+            delete payload.confirmLimitOverride;
+            sendBetRequest(payload);
+        }
+        window.acceptLimitOverride = acceptLimitOverride;
+        window.rejectLimitOverride = rejectLimitOverride;
+
+        async function sendBetRequest(payload) {
             // Bloquear botón para evitar doble envío
             submitBetBtn.disabled = true;
             const isEditing = !!window.editingBetId;
             submitBetBtn.innerHTML = isEditing ? '<i class="fas fa-save mr-2"></i>Guardando...' : '<i class="fas fa-check-circle mr-2"></i>Registrando...';
 
             try {
-                const payload = {
-                    userId: currentUser.telegram_id,
-                    lottery: selectedLottery,
-                    betType: selectedBetType,
-                    bet_type: selectedBetType,
-                    rawText,
-                    sessionId: activeSession.id
-                };
-                if (window.editingBetId) {
-                    payload.betId = window.editingBetId;
-                }
-
                 const res = await fetch('/api/bets', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1352,7 +1596,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    iziToast.success({ title: '✅ Jugada registrada', message: '¡Buena suerte!' });
+                    const wasOmitted = payload.omitLimitOverride === true;
+                    const overLimitPhrase = overLimitTypePhrase([selectedBetType]);
+                    iziToast.success({ title: '✅ Jugada registrada', message: wasOmitted ? `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.` : '¡Buena suerte!' });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();
@@ -1360,7 +1606,12 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     resetBetEditMode(true, true);
                     showSection('home');
                 } else {
-                    iziToast.error({ message: data.error || 'No se pudo registrar' });
+                    if (data.code === 'LIMIT_EXCEED_CONFIRMABLE' && data.exceedData) {
+                        pendingBetPayload = payload;
+                        showLimitOverrideModal(data.error, data.exceedData);
+                    } else {
+                        iziToast.error({ message: data.error || 'No se pudo registrar' });
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -1375,7 +1626,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     submitBetBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar cambios';
                 }
             }
-        });
+        }
 
         async function updateReferralRateText() {
             try {
@@ -1922,7 +2173,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         setTimeout(() => {
                             // Solo activar modo edición si la sesión está activa y el tipo se seleccionó
                             if (!activeSession || selectedBetType !== bet.bet_type) return;
-                            betInput.value = bet.raw_text;
+                            betInput.value = buildEditPrefill(bet);
                             betInput.dispatchEvent(new Event('input'));
                             // marcar que estamos editando para que el submit incluya betId
                             window.editingBetId = bet.id;
@@ -2103,7 +2354,12 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
         function updateTransferAvailable() {
             const currency = document.getElementById('transferCurrency').value;
             const balance = getWithdrawAvailableBalance(currency);
-            document.getElementById('transferAvailable').innerText = `Disponible en ${currency}: ${balance.toFixed(2)}`;
+            if (currency === 'USD') {
+                const cupApprox = (balance * exchangeRates.rate).toFixed(2);
+                document.getElementById('transferAvailable').innerText = `Disponible en ${currency}: ${balance.toFixed(2)} (aprox. ${cupApprox} CUP)`;
+            } else {
+                document.getElementById('transferAvailable').innerText = `Disponible en ${currency}: ${balance.toFixed(2)}`;
+            }
         }
 
         document.getElementById('submitDepositBtn').addEventListener('click', async () => {
@@ -2471,12 +2727,28 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
         async function renderPublishWinningView() {
             try {
-                const res = await fetch(`/api/admin/lottery-sessions/closed?userId=${currentUser.telegram_id}`);
-                const sessions = await res.json();
-                const pubRes = await fetch('/api/winning-numbers');
+                const [sessionsRes, pubRes, autoRes] = await Promise.all([
+                    fetch(`/api/admin/lottery-sessions/closed?userId=${currentUser.telegram_id}`),
+                    fetch('/api/admin/winning-numbers'),
+                    fetch('/api/admin/auto-publish')
+                ]);
+                const sessions = await sessionsRes.json();
                 const published = await pubRes.json();
+                let autoEnabled = false;
+                try { autoEnabled = !!(await autoRes.json()).enabled; } catch (e) {}
                 const publishedSet = new Set(published.map(p => `${p.lottery}|${p.date}|${p.time_slot}`));
-                let html = `<h4 class="text-xl font-semibold mb-4">🔢 Publicar números ganadores</h4><p class="mb-2 text-sm text-yellow-300">⚠️ 7 dígitos (centena+cuarteta). Puedes separar con espacio: 123 4567</p>`;
+                let html = `
+                    <div class="flex items-center justify-between bg-gray-800/70 p-4 rounded-xl mb-4">
+                        <div>
+                            <span class="font-semibold">🤖 Publicación automática</span>
+                            <p class="text-xs text-gray-400 mt-0.5">Extrae los números del canal de Telegram y publica los ganadores automáticamente.</p>
+                        </div>
+                        <label class="auto-switch">
+                            <input type="checkbox" id="autoPublishToggle" ${autoEnabled ? 'checked' : ''} onchange="toggleAutoPublish(this.checked, this)">
+                            <span class="auto-slider"></span>
+                        </label>
+                    </div>`;
+                html += `<h4 class="text-xl font-semibold mb-4">🔢 Publicar números ganadores</h4><p class="mb-2 text-sm text-yellow-300">⚠️ 7 dígitos (centena+cuarteta). Puedes separar con espacio: 123 4567</p>`;
                 if (sessions.length === 0) html += '<p class="text-gray-400">No hay sesiones cerradas.</p>';
                 else {
                     sessions.forEach(s => {
@@ -2490,6 +2762,26 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 adminViewContainer.innerHTML = html;
             } catch (e) { adminViewContainer.innerHTML = '<p class="text-red-400">Error al cargar sesiones.</p>'; }
         }
+
+        window.toggleAutoPublish = async (checked, input) => {
+            try {
+                const res = await fetch('/api/admin/auto-publish', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: checked })
+                });
+                if (res.ok) {
+                    iziToast.success({ message: checked ? '🤖 Publicación automática ACTIVADA' : '🤖 Publicación automática DESACTIVADA' });
+                } else {
+                    const err = await res.json();
+                    iziToast.error({ message: err.error || 'Error al cambiar el estado' });
+                    if (input) input.checked = !checked;
+                }
+            } catch (e) {
+                iziToast.error({ message: 'Error de conexión' });
+                if (input) input.checked = !checked;
+            }
+        };
 
         window.publishWinning = async (sessionId, btn) => {
             if (btn && btn.disabled) return;
@@ -4751,6 +5043,23 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             return labels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
         }
 
+        function overLimitTypePhrase(betTypes) {
+            const unique = [...new Set((betTypes || []).map(t => String(t || '').toLowerCase()))];
+            const withArticles = [];
+            if (unique.includes('fijo') || unique.includes('corridos')) withArticles.push('números');
+            if (unique.includes('centena')) withArticles.push('centenas');
+            if (unique.includes('parle')) withArticles.push('parlets');
+            if (withArticles.length === 0) return 'números';
+            if (withArticles.length === 1) {
+                return withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
+            }
+            if (withArticles.length === 2) {
+                const first = withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
+                return `${first} y ${withArticles[1]}`;
+            }
+            return 'Los números, centenas y parlets';
+        }
+
         // Añadir las funciones renderManageUsersView, searchUserByNameOrId y openBalanceModal
         let _activeUsersContainer = null;
         async function renderManageUsersView(targetContainer) {
@@ -5132,7 +5441,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             <button onclick="adjustBalance(${telegramId}, 'usd', 5)" class="bg-green-600 px-3 rounded-lg">+5</button>
                         </div>
                     </div>
-                    ${((bonus > 0 || (bonus === 0 && bonusUpdatedByAdmin))) ? `
+                    ${((bonus > 0 || (bonus === 0 && bonusUpdatedByAdmin && cup === 0 && usd === 0))) ? `
                     <div>
                         <label class="block text-sm mb-1">🎁 Bono (CUP)</label>
                         <div class="flex gap-2">
