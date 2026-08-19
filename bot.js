@@ -4192,7 +4192,7 @@ async function processWinningNumber(sessionId, winningStr, ctx) {
         .select('telegram_id');
 
     const publicWinningMessage =
-        `📢 <b>NÚMERO GANADOR PUBLICADO - La bolita cubana</b>\n\n` +
+        `📢 <b>NÚMERO GANADOR PUBLICADO - La Bolita Cubana 🇨🇺</b>\n\n` +
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> - Turno <b>${escapeHTML(session.time_slot)}</b>\n` +
         `📅 Fecha: ${session.date}\n` +
         `🔢 Número: <code>${formattedWinning}</code>\n\n` +
