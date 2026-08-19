@@ -6342,10 +6342,9 @@ bot.on(message('text'), async (ctx) => {
                         error: limitCheck.error
                     };
                     const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
-                    const isSingleOne = (clamped.totalCUP > 0 && clamped.totalUSD === 0 && clamped.totalCUP === 1)
-                        || (clamped.totalUSD > 0 && clamped.totalCUP === 0 && clamped.totalUSD === 1);
-                    const question = isSingleOne ? '¿Desea apostárselo?' : '¿Deseas apostárselos?';
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
+                    const isSingleOne = admissibleLines.length === 1 && /:\s*1\.00 (CUP|USD)\.$/.test(admissibleLines[0]);
+                    const question = isSingleOne ? '¿Deseas apostárselo?' : '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';
                     const omitLabel = betType === 'centena' ? '❌ No, omitirla(s)' : '❌ No, omitirlo(s)';
                     await ctx.reply(`${limitCheck.error}${admissibleLine}\n${question}`, {
