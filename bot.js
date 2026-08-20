@@ -4250,12 +4250,14 @@ function parseChannelResultBlocks(html) {
             time: timeMatch ? new Date(timeMatch[1]) : null
         });
     }
+    console.log(`[AutoPublish] parseChannelResultBlocks: ${blocks.length} bloques HTML, ${results.length} resultados válidos extraídos`);
     return results;
 }
 
 async function fetchChannelWinningNumber(lotteryKey, channel, minTime, maxTime, retries = 2, baseDelay = 2000) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
+            console.log(`[AutoPublish] Scraping @${channel} (intento ${attempt}/${retries})...`);
             const resp = await axios.get(`https://t.me/s/${channel}`, {
                 timeout: 15000,
                 headers: {
@@ -4272,13 +4274,18 @@ async function fetchChannelWinningNumber(lotteryKey, channel, minTime, maxTime, 
             }
 
             const results = parseChannelResultBlocks(resp.data);
+            console.log(`[AutoPublish] Bloques encontrados en canal: ${results.length} con resultado válido`, results.length > 0 ? results.map(r => `${r.lottery}:${r.number}@${r.time}`).join(', ') : '(ninguno)');
             const match = results.find(r =>
                 r.lottery === lotteryKey &&
                 r.time &&
                 r.time >= minTime &&
                 r.time <= maxTime
             );
-            if (match) return match;
+            if (match) {
+                console.log(`[AutoPublish] Match encontrado: ${match.lottery} ${match.number} @ ${match.time}`);
+                return match;
+            }
+            console.log(`[AutoPublish] Sin match para ${lotteryKey} en ventana ${minTime.toISOString()} - ${maxTime.toISOString()}`);
             return null;
         } catch (e) {
             console.warn(`[AutoPublish] Error scraping @${channel} (intento ${attempt}/${retries}):`, e.message);
@@ -4300,7 +4307,10 @@ async function autoPublishWinningResults() {
         const configMap = {};
         (configRows || []).forEach(c => { configMap[c.key] = c.value; });
 
-        if ((configMap.auto_publish_enabled || 'false') !== 'true') return;
+        if ((configMap.auto_publish_enabled || 'false') !== 'true') {
+            console.log('[AutoPublish] Deshabilitado, saltando.');
+            return;
+        }
 
         const channel = configMap.auto_publish_channel || 'resultados_de_la_bolita';
 
@@ -4313,45 +4323,75 @@ async function autoPublishWinningResults() {
 
         const today = moment.tz(TIMEZONE).format('YYYY-MM-DD');
 
-        const { data: sessions } = await supabase
+        const { data: sessions, error: sessErr } = await supabase
             .from('lottery_sessions')
             .select('*')
             .eq('status', 'closed')
             .eq('date', today);
+        if (sessErr) {
+            console.error('[AutoPublish] Error consultando sesiones:', sessErr.message);
+            return;
+        }
 
-        const { data: published } = await supabase
+        const { data: published, error: pubErr } = await supabase
             .from('winning_numbers')
-            .select('lottery, date, time_slot');
+            .select('lottery, date, time_slot')
+            .eq('date', today);
+        if (pubErr) {
+            console.error('[AutoPublish] Error consultando winning_numbers:', pubErr.message);
+            return;
+        }
 
-        const publishedSet = new Set((published || []).map(p => `${p.lottery}|${p.time_slot}`));
+        const publishedSet = new Set((published || []).map(p => `${p.lottery}|${p.date}|${p.time_slot}`));
+
+        console.log(`[AutoPublish] Sesiones cerradas hoy: ${(sessions || []).length} | Ya publicadas: ${(published || []).length} | Canal: @${channel} | Ventana: ${windowCfg.min}-${windowCfg.max} min`);
 
         const now = Date.now();
 
         for (const session of sessions || []) {
-            if (publishedSet.has(`${session.lottery}|${session.time_slot}`)) continue;
-            if (!session.end_time) continue;
+            if (publishedSet.has(`${session.lottery}|${session.date}|${session.time_slot}`)) {
+                console.log(`[AutoPublish] Saltando ${session.lottery} ${session.time_slot} — ya publicado hoy.`);
+                continue;
+            }
+            if (!session.end_time) {
+                console.warn(`[AutoPublish] Saltando ${session.lottery} ${session.time_slot} — sin end_time.`);
+                continue;
+            }
 
             const endTime = new Date(session.end_time).getTime();
             const windowStart = endTime + (windowCfg.min * 60000);
             const windowEnd = endTime + ((windowCfg.max + 10) * 60000);
 
-            if (now < windowStart) continue;
+            if (now < windowStart) {
+                const minsLeft = Math.ceil((windowStart - now) / 60000);
+                console.log(`[AutoPublish] Saltando ${session.lottery} ${session.time_slot} — ventana aún no inicia (${minsLeft} min restantes).`);
+                continue;
+            }
 
             const channelLotteryKey = {
                 'Florida': 'FLORIDA',
                 'Georgia': 'GEORGIA',
                 'Nueva York': 'NEWYORK'
             }[session.lottery];
-            if (!channelLotteryKey) continue;
+            if (!channelLotteryKey) {
+                console.warn(`[AutoPublish] Saltando ${session.lottery} ${session.time_slot} — no se pudo mapear a key de canal.`);
+                continue;
+            }
 
             if (now <= windowEnd) {
+                console.log(`[AutoPublish] Buscando ganador para ${session.lottery} ${session.time_slot} en @${channel} (ventana ${new Date(windowStart).toISOString()} - ${new Date(windowEnd).toISOString()})...`);
                 const winner = await fetchChannelWinningNumber(channelLotteryKey, channel, new Date(windowStart), new Date(windowEnd));
                 if (winner) {
+                    console.log(`[AutoPublish] Ganador encontrado: ${winner.number} (lottery: ${winner.lottery}, time: ${winner.time})`);
                     const ok = await processWinningNumber(session.id, winner.number, null);
                     console.log(`[AutoPublish] ${ok ? '✅ Publicado' : '❌ Falló publicación'}: ${session.lottery} ${session.time_slot} (${session.date}) número ${winner.number}`);
+                } else {
+                    console.warn(`[AutoPublish] ⚠️ No se encontró ganador para ${session.lottery} ${session.time_slot} en @${channel} dentro de la ventana.`);
                 }
                 continue;
             }
+
+            console.warn(`[AutoPublish] Ventana agotada para ${session.lottery} ${session.time_slot} — notificando admin.`);
 
             let failures = {};
             try {
@@ -4359,7 +4399,10 @@ async function autoPublishWinningResults() {
             } catch (e) { console.warn('[AutoPublish] auto_publish_failures inválido:', e.message); }
 
             const failureKey = `${session.lottery}|${session.time_slot}|${session.date}`;
-            if (failures[failureKey]) continue;
+            if (failures[failureKey]) {
+                console.log(`[AutoPublish] Fallo ya notificado anteriormente para ${failureKey}, saltando.`);
+                continue;
+            }
 
             failures[failureKey] = true;
             const { error: upsertError } = await supabase
