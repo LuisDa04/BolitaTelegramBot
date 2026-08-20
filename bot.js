@@ -2734,6 +2734,8 @@ bot.action(/lot_(.+)/, async (ctx) => {
         ctx.session.lottery = lotteryName;
         ctx.session.sessionId = activeSession.id;
 
+        try { await ctx.deleteMessage(); } catch (e) {}
+
         const videoPath = lotteryVideoMap[lotteryKey];
         if (videoPath) {
             try {
@@ -2743,10 +2745,10 @@ bot.action(/lot_(.+)/, async (ctx) => {
             }
         }
 
-        await safeEdit(ctx,
+        await ctx.reply(
             `✅ Has seleccionado <b>${escapeHTML(lotteryName)}</b> - Turno <b>${escapeHTML(activeSession.time_slot)}</b>.\n` +
             `Ahora elige el tipo de jugada que deseas realizar:`,
-            playTypeKbd()
+            { parse_mode: 'HTML', reply_markup: playTypeKbd().reply_markup }
         );
     } catch (e) {
         console.error('Error en lot_ handler:', e);
