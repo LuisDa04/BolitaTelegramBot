@@ -2734,6 +2734,7 @@ bot.action(/lot_(.+)/, async (ctx) => {
         ctx.session.lottery = lotteryName;
         ctx.session.sessionId = activeSession.id;
 
+        await ctx.answerCbQuery().catch(() => {});
         try { await ctx.deleteMessage(); } catch (e) {}
 
         const videoPath = lotteryVideoMap[lotteryKey];
