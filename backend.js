@@ -3534,6 +3534,15 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
 
 // --- Publicar número ganador ---
 app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
+    const { data: autoCfg } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'auto_publish_enabled')
+        .maybeSingle();
+    if ((autoCfg?.value || 'false') === 'true') {
+        return res.status(400).json({ error: '❌ No se puede publicar manualmente porque está activada la publicación automática.' });
+    }
+
     const { sessionId, winningNumber } = req.body;
     if (!sessionId || !winningNumber) return res.status(400).json({ error: 'Faltan datos' });
 

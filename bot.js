@@ -3886,6 +3886,17 @@ bot.action('adm_view', async (ctx) => {
 bot.action('admin_winning', async (ctx) => {
     if (!isAdmin(ctx.from.id) && !(await hasRole(ctx.from.id, 'schedule_manager'))) return;
 
+    const { data: autoCfg } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'auto_publish_enabled')
+        .maybeSingle();
+    if ((autoCfg?.value || 'false') === 'true') {
+        await ctx.reply('❌ No se puede publicar manualmente porque está activada la publicación automática.');
+        await ctx.answerCbQuery();
+        return;
+    }
+
     const { data: closedSessions } = await supabase
         .from('lottery_sessions')
         .select('*')
