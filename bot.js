@@ -3973,7 +3973,7 @@ function formatWinningNumber(num) {
     return num.slice(0, 3) + ' ' + num.slice(3);
 }
 
-async function processWinningNumber(sessionId, winningStr, ctx) {
+async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null) {
     const logReply = (msg, opts) => {
         if (ctx && typeof ctx.reply === 'function') return ctx.reply(msg, opts);
         console.log(`[Publicación automática] ${String(msg).replace(/<[^>]*>/g, '')}`);
@@ -4227,17 +4227,32 @@ async function processWinningNumber(sessionId, winningStr, ctx) {
         .select('telegram_id');
 
     const botName = (await bot.telegram.getMe().catch(() => ({}))).first_name || 'La Bolita Cubana';
-    const publicWinningMessage =
+    const publicHeader =
         `📢 <b>NÚMERO GANADOR PUBLICADO - ${escapeHTML(botName)} 🇨🇺</b>\n\n` +
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> - Turno <b>${escapeHTML(session.time_slot)}</b>\n` +
-        `📅 Fecha: ${session.date}\n` +
-        `🔢 Número: <code>${formattedWinning}</code>\n\n` +
-        `💬 Revisa tu historial para ver si has ganado. ¡Mucha suerte en las próximas jugadas! 🍀`;
+        `📅 Fecha: ${session.date}`;
+    const publicFooter = `\n\n💬 Revisa tu historial para ver si has ganado. ¡Mucha suerte en las próximas jugadas! 🍀`;
+    // Automática con foto: el número se ve en la imagen → sin línea de número
+    const publicWinningMessagePhoto = `${publicHeader}${publicFooter}`;
+    // Texto completo (manual, o respaldo si falla la foto): incluye el número
+    const publicWinningMessage =
+        `${publicHeader}\n🔢 Número: <code>${formattedWinning}</code>${publicFooter}`;
 
     for (const u of allUsers || []) {
         if (winnerIds.has(String(u.telegram_id))) continue;
         try {
-            await bot.telegram.sendMessage(u.telegram_id, publicWinningMessage, { parse_mode: 'HTML' });
+            let sent = false;
+            if (photoUrl) {
+                try {
+                    await bot.telegram.sendPhoto(u.telegram_id, photoUrl, { caption: publicWinningMessagePhoto, parse_mode: 'HTML' });
+                    sent = true;
+                } catch (photoErr) {
+                    console.warn(`sendPhoto falló para ${u.telegram_id}, enviando texto:`, photoErr.message);
+                }
+            }
+            if (!sent) {
+                await bot.telegram.sendMessage(u.telegram_id, publicWinningMessage, { parse_mode: 'HTML' });
+            }
             await new Promise(resolve => setTimeout(resolve, 30));
         } catch (e) {
             console.warn(`Error enviando broadcast de ganador a ${u.telegram_id}:`, e.message);
@@ -4275,10 +4290,18 @@ function parseChannelResultBlocks(html) {
         if (!numMatch) continue;
         const number = (numMatch[1] + numMatch[2]).replace(/\s+/g, '');
         if (!/^\d{7}$/.test(number)) continue;
+        // Foto del post en la vista previa web del canal (para publicarla junto al mensaje)
+        let photo = null;
+        const photoTagMatch = block.match(/tgme_widget_message_photo_wrap[^>]*>/);
+        if (photoTagMatch) {
+            const urlMatch = photoTagMatch[0].match(/background-image:\s*url\('([^']+)'\)/);
+            if (urlMatch) photo = urlMatch[1].replace(/&amp;/g, '&');
+        }
         results.push({
             lottery: String(lotteryMatch[1]).toUpperCase().replace(/\s+/g, ''),
             number,
-            time: timeMatch ? new Date(timeMatch[1]) : null
+            time: timeMatch ? new Date(timeMatch[1]) : null,
+            photo
         });
     }
     console.log(`[AutoPublish] parseChannelResultBlocks: ${blocks.length} bloques HTML, ${results.length} resultados válidos extraídos`);
@@ -4414,7 +4437,7 @@ async function autoPublishWinningResults() {
                 const winner = await fetchChannelWinningNumber(channelLotteryKey, channel, new Date(windowStart), new Date(windowEnd));
                 if (winner) {
                     console.log(`[AutoPublish] Ganador encontrado: ${winner.number} (lottery: ${winner.lottery}, time: ${winner.time})`);
-                    const ok = await processWinningNumber(session.id, winner.number, null);
+                    const ok = await processWinningNumber(session.id, winner.number, null, winner.photo || null);
                     console.log(`[AutoPublish] ${ok ? '✅ Publicado' : '❌ Falló publicación'}: ${session.lottery} ${session.time_slot} (${session.date}) número ${winner.number}`);
                 } else {
                     console.warn(`[AutoPublish] ⚠️ No se encontró ganador para ${session.lottery} ${session.time_slot} en @${channel} dentro de la ventana.`);
