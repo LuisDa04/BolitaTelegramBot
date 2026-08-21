@@ -1765,7 +1765,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 if (/eliminada/i.test(e.message || '')) {
                     showAccountRemovedOverlay(
                         '⚠️ Tu cuenta fue eliminada',
-                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
                     );
                     return;
                 }
@@ -1834,21 +1834,27 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
         let accountRemovedHandled = false;
 
-        // Cuenta eliminada por admin (o expulsada): bloquear UI y cerrar la Mini App.
+        // Cuenta eliminada por admin (o expulsada): bloquear UI hasta que el usuario cierre la webapp.
         function showAccountRemovedOverlay(title, subtitle) {
             if (accountRemovedHandled) return;
             accountRemovedHandled = true;
             try {
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.94);display:flex;align-items:center;justify-content:center;padding:20px;';
-                overlay.innerHTML = '<div class="error-box" style="margin:0;">' +
-                    '<h3 style="font-size:1.15rem;margin-bottom:10px;">' + title + '</h3>' +
-                    '<p style="font-size:.9rem;line-height:1.4;">' + subtitle + '</p></div>';
+                const box = document.createElement('div');
+                box.className = 'error-box';
+                box.style.margin = '0';
+                box.innerHTML = '<h3 style="font-size:1.15rem;margin-bottom:10px;">' + title + '</h3>' +
+                    '<p style="font-size:.9rem;line-height:1.4;">' + subtitle + '</p>';
+                const closeBtn = document.createElement('button');
+                closeBtn.innerText = 'Cerrar';
+                closeBtn.addEventListener('click', () => {
+                    try { window.Telegram.WebApp.close(); } catch (e) { /* silent */ }
+                });
+                box.appendChild(closeBtn);
+                overlay.appendChild(box);
                 document.body.appendChild(overlay);
             } catch (e) { /* silent */ }
-            setTimeout(() => {
-                try { window.Telegram.WebApp.close(); } catch (e) { /* silent */ }
-            }, 2500);
         }
 
         async function fetchBalance() {
@@ -1858,7 +1864,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 if (res.status === 404) {
                     showAccountRemovedOverlay(
                         '⚠️ Tu cuenta fue eliminada',
-                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
                     );
                     return;
                 }
@@ -1867,7 +1873,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     if (body.deleted) {
                         showAccountRemovedOverlay(
                             '⚠️ Tu cuenta fue eliminada',
-                            'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                            'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
                         );
                     }
                     return;
