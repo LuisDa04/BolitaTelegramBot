@@ -4232,7 +4232,7 @@ async function processWinningNumber(sessionId, winningStr, ctx) {
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> - Turno <b>${escapeHTML(session.time_slot)}</b>\n` +
         `📅 Fecha: ${session.date}\n` +
         `🔢 Número: <code>${formattedWinning}</code>\n\n` +
-        `💬 Revisa tu historial para ver si has ganado. ¡Mucha suerte en las próximas jugadas!`;
+        `💬 Revisa tu historial para ver si has ganado. ¡Mucha suerte en las próximas jugadas! 🍀`;
 
     for (const u of allUsers || []) {
         if (winnerIds.has(String(u.telegram_id))) continue;

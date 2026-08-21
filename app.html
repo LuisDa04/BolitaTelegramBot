@@ -1760,6 +1760,15 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
             } catch (e) {
                 console.error('Error en initAuth:', e);
+                // Usuario eliminado por admin intentando entrar desde cero:
+                // mostrar aviso y cerrar la Mini App (debe volver vía bot /start)
+                if (/eliminada/i.test(e.message || '')) {
+                    showAccountRemovedOverlay(
+                        '⚠️ Tu cuenta fue eliminada',
+                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                    );
+                    return;
+                }
                 globalLoader.innerHTML = `
                     <div class="error-box">
                         <i class="fas fa-exclamation-triangle text-5xl mb-4"></i>
