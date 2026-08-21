@@ -1823,10 +1823,46 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             }
         }
 
+        let accountRemovedHandled = false;
+
+        // Cuenta eliminada por admin (o expulsada): bloquear UI y cerrar la Mini App.
+        function showAccountRemovedOverlay(title, subtitle) {
+            if (accountRemovedHandled) return;
+            accountRemovedHandled = true;
+            try {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.94);display:flex;align-items:center;justify-content:center;padding:20px;';
+                overlay.innerHTML = '<div class="error-box" style="margin:0;">' +
+                    '<h3 style="font-size:1.15rem;margin-bottom:10px;">' + title + '</h3>' +
+                    '<p style="font-size:.9rem;line-height:1.4;">' + subtitle + '</p></div>';
+                document.body.appendChild(overlay);
+            } catch (e) { /* silent */ }
+            setTimeout(() => {
+                try { window.Telegram.WebApp.close(); } catch (e) { /* silent */ }
+            }, 2500);
+        }
+
         async function fetchBalance() {
-            if (!currentUser?.telegram_id) return;
+            if (!currentUser?.telegram_id || accountRemovedHandled) return;
             try {
                 const res = await fetch(`/api/user/balance?telegram_id=${currentUser.telegram_id}`);
+                if (res.status === 404) {
+                    showAccountRemovedOverlay(
+                        '⚠️ Tu cuenta fue eliminada',
+                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                    );
+                    return;
+                }
+                if (res.status === 403) {
+                    const body = await res.json().catch(() => ({}));
+                    if (body.deleted) {
+                        showAccountRemovedOverlay(
+                            '⚠️ Tu cuenta fue eliminada',
+                            'Si deseas volver a jugar, abre el bot y presiona Inicio (/start). Esta ventana se cerrará...'
+                        );
+                    }
+                    return;
+                }
                 if (!res.ok) return;
                 const data = await res.json();
                 currentUser.cup = data.cup;

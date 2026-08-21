@@ -1361,9 +1361,24 @@ app.use(async (req, res, next) => {
                 .from('users')
                 .select('is_banned')
                 .eq('telegram_id', tgUser.id)
-                .single();
+                .maybeSingle();
             if (banCheck && banCheck.is_banned) {
                 return res.status(403).json({ error: 'Tu cuenta ha sido baneada.' });
+            }
+            // Usuario sin fila en `users`: si figura en deleted_users fue eliminado
+            // por un admin → bloquear toda la webapp hasta que se registre vía bot (/start)
+            if (!banCheck) {
+                const { data: deletedCheck } = await supabase
+                    .from('deleted_users')
+                    .select('telegram_id')
+                    .eq('telegram_id', tgUser.id)
+                    .maybeSingle();
+                if (deletedCheck) {
+                    return res.status(403).json({
+                        deleted: true,
+                        error: 'Tu cuenta fue eliminada. Para volver, abre el bot y presiona Inicio.'
+                    });
+                }
             }
         } catch (e) {}
     }
@@ -1479,8 +1494,10 @@ app.get('/api/user/balance', async (req, res) => {
         .from('users')
         .select('cup, usd, bonus_cup')
         .eq('telegram_id', telegram_id)
-        .single();
+        .maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+    // Sin fila = usuario eliminado por admin mientras tenía la web abierta
+    if (!data) return res.status(404).json({ deleted: true });
     res.json({ cup: data.cup, usd: data.usd, bonus_cup: data.bonus_cup });
 });
 
@@ -3790,7 +3807,7 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${session.lottery}</b> - Turno <b>${session.time_slot}</b>\n` +
         `📅 Fecha: ${session.date}\n` +
         `🔢 Número: <code>${formattedBroadcast}</code>\n\n` +
-        `💬 Revisa tu historial para ver si has ganado. ¡Suerte en la próxima!`
+        `💬 Revisa tu historial para ver si has ganado. ¡Suerte en la próxima! 🍀`
     );
 
     res.json({ success: true, message: 'Números publicados y premios calculados' });
