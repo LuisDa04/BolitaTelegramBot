@@ -47,6 +47,9 @@
         }
         .hidden-section { display: none; }
         .active-section { display: block; }
+        /* Fallback local: ocultar no debe depender del CDN de Tailwind */
+        .modal.hidden { display: none; }
+        .hidden { display: none !important; }
         .loader {
             border: 4px solid rgba(255,255,255,0.3);
             border-top: 4px solid #00ffff;
