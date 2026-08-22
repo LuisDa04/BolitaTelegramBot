@@ -4247,11 +4247,15 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
         `🎰 ${regionMap[session.lottery]?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> - Turno <b>${escapeHTML(session.time_slot)}</b>\n` +
         `📅 Fecha: ${session.date}`;
     const publicFooter = `\n\n💬 Revisa tu historial para ver si has ganado. ¡Mucha suerte en las próximas jugadas! 🍀`;
-    // Automática con foto: el número se ve en la imagen → sin línea de número
-    const publicWinningMessagePhoto = `${publicHeader}${publicFooter}`;
     // Texto completo (manual, o respaldo si falla la foto): incluye el número
     const publicWinningMessage =
         `${publicHeader}\n🔢 Número: <code>${formattedWinning}</code>${publicFooter}`;
+    // Automática con foto: el número se ve en la imagen → sin línea de número.
+    // Mismo encabezado y, tras 2 saltos de línea, fecha y turno juntos.
+    const publicWinningMessagePhoto =
+        `📢 <b>NÚMERO GANADOR PUBLICADO - ${escapeHTML(botName)} 🇨🇺</b>\n\n` +
+        `📅 Fecha: ${session.date} - Turno ${escapeHTML(session.time_slot)}` +
+        `${publicFooter}`;
 
     for (const u of allUsers || []) {
         if (winnerIds.has(String(u.telegram_id))) continue;
