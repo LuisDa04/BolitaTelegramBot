@@ -2666,6 +2666,12 @@ bot.action('main', async (ctx) => {
 });
 
 bot.action('play', async (ctx) => {
+    // Eliminar el GIF de la lotería seleccionada anteriormente (no se acumulan)
+    try {
+        const gifId = ctx.session?.lotteryGifMessageId;
+        if (gifId) await ctx.telegram.deleteMessage(ctx.chat.id, gifId);
+    } catch (e) { /* ya borrado o demasiado antiguo */ }
+    ctx.session.lotteryGifMessageId = null;
     await safeEdit(ctx, '🎲 Elige una lotería para comenzar:', playLotteryKbd());
 });
 
@@ -2740,7 +2746,9 @@ bot.action(/lot_(.+)/, async (ctx) => {
         const videoPath = lotteryVideoMap[lotteryKey];
         if (videoPath) {
             try {
-                await ctx.replyWithAnimation({ source: videoPath }, { protect_content: true });
+                const animMsg = await ctx.replyWithAnimation({ source: videoPath }, { protect_content: true });
+                // Guardar para poder eliminarlo si el usuario vuelve atrás
+                ctx.session.lotteryGifMessageId = animMsg.message_id;
             } catch (e) {
                 console.warn('Error enviando video de lotería:', e.message);
             }
