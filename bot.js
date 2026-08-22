@@ -4460,7 +4460,20 @@ async function autoPublishWinningResults() {
                 continue;
             }
 
-            console.warn(`[AutoPublish] Ventana agotada para ${session.lottery} ${session.time_slot} — notificando admin.`);
+            console.warn(`[AutoPublish] Ventana agotada para ${session.lottery} ${session.time_slot} — evaluando notificación al admin.`);
+
+            // Re-verificar el flag justo antes de notificar: si la publicación
+            // automática está desactivada, no se intentó publicar y no corresponde
+            // avisar fallo al admin (ni registrar el fallo).
+            const { data: enabledNow } = await supabase
+                .from('app_config')
+                .select('value')
+                .eq('key', 'auto_publish_enabled')
+                .maybeSingle();
+            if ((enabledNow?.value || 'false') !== 'true') {
+                console.log(`[AutoPublish] Desactivada: omitiendo aviso de fallo para ${session.lottery} ${session.time_slot}.`);
+                continue;
+            }
 
             let failures = {};
             try {
