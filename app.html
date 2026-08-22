@@ -2942,11 +2942,16 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             // Mostrar tipo de jugada si viene en la respuesta
                             const betTypeRaw = w.bet_type || w.betType || w.type || w.play_type || '';
                             const betTypeLabel = escapeHTML(formatBetTypeLabel(betTypeRaw));
+                            // Debajo del nombre: @username de Telegram; si no tiene, el ID de Telegram
+                            const userHandle = (w.username && String(w.username).trim())
+                                ? `@${escapeHTML(String(w.username).trim())}`
+                                : `ID ${escapeHTML(String(w.user_id ?? w.telegram_id ?? '—'))}`;
                             modalContent += `<div class="bg-gray-700/50 p-3 rounded-lg">
                                 <div class="flex justify-between items-center">
                                     <div>
                                         <span class="font-bold">${escapeHTML(w.first_name || 'Ganador')}</span>
                                         <span class="ml-2 text-xs bg-gray-800 text-gray-200 px-2 py-0.5 rounded">${betTypeLabel}</span>
+                                        <p class="text-xs text-cyan-300 mt-0.5">${userHandle}</p>
                                     </div>
                                     <span class="text-cyan-300">${w.prize_cup.toFixed(2)} CUP / ${w.prize_usd.toFixed(2)} USD</span>
                                 </div>

@@ -3537,7 +3537,7 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
         if (premioTotalUSD > 0 || premioTotalCUP > 0) {
             const { data: user } = await supabase
                 .from('users')
-                .select('first_name')
+                .select('first_name, username')
                 .eq('telegram_id', bet.user_id)
                 .single();
 
@@ -3545,6 +3545,7 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
             winners.push({
                 user_id: bet.user_id,
                 first_name: user?.first_name || 'Usuario',
+                username: user?.username || null,
                 prize_usd: premioTotalUSD,
                 prize_cup: premioTotalCUP,
                 bonus_moved: bonusMoved,
