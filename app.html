@@ -675,7 +675,17 @@
             if (typeof url === 'string' && url.startsWith('/api')) {
                 const headers = new Headers(options.headers || {});
                 headers.set('X-Telegram-Init-Data', TG.initData);
-                return originalFetch.call(this, url, { ...options, headers });
+                return originalFetch.call(this, url, { ...options, headers }).then(res => {
+                    // Usuario eliminado por admin: cualquier acción lo detecta al instante
+                    if (res.status === 403 || res.status === 404) {
+                        try {
+                            res.clone().json().then(body => {
+                                if (body && body.deleted) showAccountRemovedOverlay();
+                            }).catch(() => {});
+                        } catch (e) { /* silent */ }
+                    }
+                    return res;
+                });
             }
             return originalFetch.call(this, url, options);
         };
@@ -1749,7 +1759,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     loadReferralStats()
                 ]);
 
-                setInterval(fetchBalance, 15000);
+                setInterval(fetchBalance, 5000);
 
                 globalLoader.classList.add('hidden');
                 mainContent.classList.remove('hidden');
@@ -1761,12 +1771,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             } catch (e) {
                 console.error('Error en initAuth:', e);
                 // Usuario eliminado por admin intentando entrar desde cero:
-                // mostrar aviso y cerrar la Mini App (debe volver vía bot /start)
+                // mostrar el mensaje del bot y esperar que cierre la webapp
                 if (/eliminada/i.test(e.message || '')) {
-                    showAccountRemovedOverlay(
-                        '⚠️ Tu cuenta fue eliminada',
-                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
-                    );
+                    showAccountRemovedOverlay();
                     return;
                 }
                 globalLoader.innerHTML = `
@@ -1834,24 +1841,34 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
         let accountRemovedHandled = false;
 
-        // Cuenta eliminada por admin (o expulsada): bloquear UI hasta que el usuario cierre la webapp.
-        function showAccountRemovedOverlay(title, subtitle) {
+        // Cuenta eliminada por admin: mostrar el MISMO mensaje que envía el bot al
+        // eliminado-re registrado que toca un botón sin haber tocado /start (bot.js),
+        // con botón Cerrar para salir de la webapp.
+        function showAccountRemovedOverlay() {
             if (accountRemovedHandled) return;
             accountRemovedHandled = true;
+            let firstName = '';
             try {
-                const overlay = document.createElement('div');
-                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.94);display:flex;align-items:center;justify-content:center;padding:20px;';
+                const params = new URLSearchParams(decodeURIComponent(TG.initData || ''));
+                firstName = JSON.parse(params.get('user') || '{}').first_name || '';
+            } catch (e) { /* silent */ }
+            if (!firstName && currentUser) firstName = currentUser.first_name || '';
+            try {
                 const box = document.createElement('div');
                 box.className = 'error-box';
                 box.style.margin = '0';
-                box.innerHTML = '<h3 style="font-size:1.15rem;margin-bottom:10px;">' + title + '</h3>' +
-                    '<p style="font-size:.9rem;line-height:1.4;">' + subtitle + '</p>';
+                box.innerHTML =
+                    '<h3 style="font-size:1.15rem;margin-bottom:10px;">👋 ¡Hola de nuevo, ' + escapeHTML(firstName) + '!</h3>' +
+                    '<p style="font-size:.9rem;line-height:1.5;">¿En qué podemos ayudarte hoy?<br><br>' +
+                    'Por favor, selecciona el botón <b>Inicio</b> en el menú lateral si deseas continuar interactuando con nuestro asistente.</p>';
                 const closeBtn = document.createElement('button');
                 closeBtn.innerText = 'Cerrar';
                 closeBtn.addEventListener('click', () => {
                     try { window.Telegram.WebApp.close(); } catch (e) { /* silent */ }
                 });
                 box.appendChild(closeBtn);
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.94);display:flex;align-items:center;justify-content:center;padding:20px;';
                 overlay.appendChild(box);
                 document.body.appendChild(overlay);
             } catch (e) { /* silent */ }
@@ -1862,20 +1879,12 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             try {
                 const res = await fetch(`/api/user/balance?telegram_id=${currentUser.telegram_id}`);
                 if (res.status === 404) {
-                    showAccountRemovedOverlay(
-                        '⚠️ Tu cuenta fue eliminada',
-                        'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
-                    );
+                    showAccountRemovedOverlay();
                     return;
                 }
                 if (res.status === 403) {
                     const body = await res.json().catch(() => ({}));
-                    if (body.deleted) {
-                        showAccountRemovedOverlay(
-                            '⚠️ Tu cuenta fue eliminada',
-                            'Si deseas volver a jugar, abre el bot y presiona Inicio (/start).'
-                        );
-                    }
+                    if (body.deleted) showAccountRemovedOverlay();
                     return;
                 }
                 if (!res.ok) return;
