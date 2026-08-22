@@ -1979,12 +1979,14 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
     return true;
 }
 
+// Devuelve {items, ok}. ok=false si algún token de la línea no corresponde al
+// tipo de apuesta seleccionado (no se descarta en silencio).
 function parseBetLine(line, betType) {
     line = line.trim().toLowerCase();
-    if (!line) return [];
+    if (!line) return { items: [], ok: false };
 
     const match = line.match(/^([\d\s,xtd]+)\s*(?:con|\*)\s*([0-9.]+)\s*(usd|cup|usdt|trx|mlc)$/i);
-    if (!match) return [];
+    if (!match) return { items: [], ok: false };
 
     let numerosStr = match[1].trim();
     const montoStr = match[2];
@@ -1992,7 +1994,7 @@ function parseBetLine(line, betType) {
 
     const numeros = numerosStr.split(/[\s,]+/).filter(n => n.length > 0);
     const montoBase = parseFloat(montoStr);
-    if (isNaN(montoBase) || montoBase <= 0) return [];
+    if (isNaN(montoBase) || montoBase <= 0) return { items: [], ok: false };
 
     const resultados = [];
 
@@ -2009,18 +2011,16 @@ function parseBetLine(line, betType) {
             continue;
         }
 
-        if (betType === 'fijo') {
-            if (!/^\d{2}$/.test(numero)) {
-                continue;
-            }
-        } else if (betType === 'corridos') {
-            if (!/^\d{2}$/.test(numero)) continue;
+        let formatoValido = false;
+        if (betType === 'fijo' || betType === 'corridos') {
+            formatoValido = /^\d{2}$/.test(numero);
         } else if (betType === 'centena') {
-            if (!/^\d{3}$/.test(numero)) continue;
+            formatoValido = /^\d{3}$/.test(numero);
         } else if (betType === 'parle') {
-            if (!/^\d{2}x\d{2}$/.test(numero)) continue;
-        } else {
-            continue;
+            formatoValido = /^\d{2}x\d{2}$/.test(numero);
+        }
+        if (!formatoValido) {
+            return { items: [], ok: false };
         }
 
         resultados.push({
@@ -2030,17 +2030,24 @@ function parseBetLine(line, betType) {
         });
     }
 
-    return resultados;
+    return { items: resultados, ok: true };
 }
 
+// ok=true solo si TODAS las líneas son válidas y hay al menos 1 item.
+// Si ok=false, igual devuelve los items parciales parseados.
 function parseBetMessage(text, betType) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     const items = [];
     let totalUSD = 0, totalCUP = 0;
+    let todasLasLineasOk = true;
 
     for (const line of lines) {
-        const parsedItems = parseBetLine(line, betType);
-        for (const item of parsedItems) {
+        const parsedLine = parseBetLine(line, betType);
+        if (!parsedLine.ok) {
+            todasLasLineasOk = false;
+            continue;
+        }
+        for (const item of parsedLine.items) {
             items.push(item);
             totalUSD += item.usd;
             totalCUP += item.cup;
@@ -2051,7 +2058,7 @@ function parseBetMessage(text, betType) {
         items,
         totalUSD,
         totalCUP,
-        ok: items.length > 0
+        ok: todasLasLineasOk && items.length > 0
     };
 }
 
