@@ -2477,7 +2477,7 @@ async function sendNewUserWelcome(ctx) {
         try {
             await ctx.replyWithPhoto(
                 { source: welcomePhotoPath },
-                { caption: welcomeText, reply_markup: getMainKeyboard(ctx).reply_markup }
+                { caption: welcomeText, reply_markup: getMainKeyboard(ctx).reply_markup, protect_content: true }
             );
             photoSent = true;
         } catch (photoErr) {
