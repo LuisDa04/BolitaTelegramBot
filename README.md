@@ -24,7 +24,7 @@ sistema de bonos, referidos, recargas/retiros multi-moneda y sesiones de juego p
 | `bot.js` | Bot de Telegram (Telegraf): comandos, apuestas, panel, broadcasts |
 | `backend.js` | API Express + servidor de la Web App (autenticación vía initData de Telegram) |
 | `app.html` | Interfaz web (Telegram Web App) con Tailwind CSS |
-| `Assets/` | Imágenes: sesiones por lotería/turno, fondo web (`back.jpg`) y bienvenida (`inicio.webp`) |
+| `Assets/` | Imágenes: sesiones por lotería/turno, fondo web (`Back.jpg`) y bienvenida (`Inicio.webp`) |
 
 ## ⚙️ Tecnologías
 
