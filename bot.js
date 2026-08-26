@@ -77,6 +77,17 @@ const bot = new Telegraf(BOT_TOKEN);
 bot.pendingNotifications = new Map();
 let botInfo = { username: 'bot', first_name: 'Bot' };
 
+// ========== LOCK POR USUARIO PARA APUESTAS CONCURRENTES ==========
+const userBetLocks = new Map();
+async function withUserBetLock(userId, fn) {
+    while (userBetLocks.has(userId)) await userBetLocks.get(userId);
+    let resolve;
+    const p = new Promise(r => resolve = r);
+    userBetLocks.set(userId, p);
+    try { return await fn(); }
+    finally { userBetLocks.delete(userId); resolve(); }
+}
+
 // ========== CONFIGURAR COMANDOS DEL MENÚ LATERAL ==========
 const MENU_COMMANDS = [
   { command: 'start', description: '🏠 Inicio' },
@@ -1105,10 +1116,10 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
 }
 // ========== END FETCH OCR RATES ==========
 
-async function buildCrossCurrencyDebitPlan(user, amount, currency) {
+async function buildCrossCurrencyDebitPlan(user, amount, currency, rateUSDOverride = null) {
     const cupBalance = parseFloat(user?.cup) || 0;
     const usdBalance = parseFloat(user?.usd) || 0;
-    const rateUSD = await getExchangeRateUSD();
+    const rateUSD = rateUSDOverride || await getExchangeRateUSD();
     const amountCUP = await convertToCUP(amount, currency);
     const totalAvailableCUP = cupBalance + (usdBalance * rateUSD);
 
@@ -1143,10 +1154,10 @@ async function buildCrossCurrencyDebitPlan(user, amount, currency) {
     };
 }
 
-async function buildRealBalanceDebitPlan(user, amount, currency) {
+async function buildRealBalanceDebitPlan(user, amount, currency, rateUSDOverride = null) {
     const cupBalance = parseFloat(user?.cup) || 0;
     const usdBalance = parseFloat(user?.usd) || 0;
-    const rateUSD = await getExchangeRateUSD();
+    const rateUSD = rateUSDOverride || await getExchangeRateUSD();
     const parsedAmount = parseFloat(amount) || 0;
 
     if (currency === 'USD') {
@@ -1176,7 +1187,7 @@ async function buildRealBalanceDebitPlan(user, amount, currency) {
         };
     }
 
-    return buildCrossCurrencyDebitPlan(user, parsedAmount, currency);
+    return buildCrossCurrencyDebitPlan(user, parsedAmount, currency, rateUSDOverride);
 }
 
 // ========== FUNCIÓN GETUSER MODIFICADA (AHORA NO ENVÍA BONO DIRECTAMENTE) ==========
@@ -1772,6 +1783,7 @@ function overLimitTypePhrase(betTypes) {
 }
 
 async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawText, items, totalCUP, totalUSD, session }) {
+    return await withUserBetLock(uid, async () => {
     const cupBalance = parseFloat(user.cup) || 0;
     const usdBalance = parseFloat(user.usd) || 0;
     const bonusBalance = parseFloat(user.bonus_cup) || 0;
@@ -1978,6 +1990,7 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         delete session.pendingBetOverride;
     }
     return true;
+    });
 }
 
 // Devuelve {items, ok}. ok=false si algún token de la línea no corresponde al
@@ -6905,10 +6918,9 @@ bot.action(/approve_withdraw_(\d+)/, async (ctx) => {
         const requestId = parseInt(ctx.match[1]);
         const { data: request } = await supabase
             .from('withdraw_requests')
-            .update({ status: 'approved', updated_at: new Date(), processed_at: new Date(), processed_by: ctx.from.id })
+            .select('*')
             .eq('id', requestId)
             .eq('status', 'pending')
-            .select()
             .single();
 
         if (!request) {
@@ -6923,12 +6935,18 @@ bot.action(/approve_withdraw_(\d+)/, async (ctx) => {
             .single();
 
         const amount = parseFloat(request.amount) || 0;
-        const debitPlan = await buildRealBalanceDebitPlan(user, amount, request.currency);
+        const originalRate = (request.amount_usd > 0) ? (amount / parseFloat(request.amount_usd)) : null;
+        const debitPlan = await buildRealBalanceDebitPlan(user, amount, request.currency, originalRate);
 
         if (!debitPlan.ok) {
             await ctx.reply(`❌ ${debitPlan.errorMessage || 'El usuario ya no tiene saldo suficiente para este retiro.'}`);
             return;
         }
+
+        await supabase
+            .from('withdraw_requests')
+            .update({ status: 'approved', updated_at: new Date(), processed_at: new Date(), processed_by: ctx.from.id })
+            .eq('id', requestId);
 
         await supabase
             .from('users')

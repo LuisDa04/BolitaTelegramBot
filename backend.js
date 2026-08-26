@@ -156,6 +156,17 @@ async function updatePendingNotifications(key, statusText) {
     pendingNotifications.delete(key);
 }
 
+// ========== LOCK POR USUARIO PARA APUESTAS CONCURRENTES ==========
+const userBetLocks = new Map();
+async function withUserBetLock(userId, fn) {
+    while (userBetLocks.has(userId)) await userBetLocks.get(userId);
+    let resolve;
+    const p = new Promise(r => resolve = r);
+    userBetLocks.set(userId, p);
+    try { return await fn(); }
+    finally { userBetLocks.delete(userId); resolve(); }
+}
+
 // Almacén de idempotencia para transferencias (evita doble proceso)
 const transferIdempotencyStore = new Map();
 const IDEMPOTENCY_TTL = 5 * 60 * 1000; // 5 minutos
@@ -390,10 +401,10 @@ async function convertFromCUP(amountCUP, targetCurrency) {
     }
 }
 
-async function buildCrossCurrencyDebitPlan(user, amount, currency) {
+async function buildCrossCurrencyDebitPlan(user, amount, currency, rateUSDOverride = null) {
     const cupBalance = parseFloat(user?.cup) || 0;
     const usdBalance = parseFloat(user?.usd) || 0;
-    const rateUSD = await getExchangeRateUSD();
+    const rateUSD = rateUSDOverride || await getExchangeRateUSD();
     const amountCUP = await convertToCUP(amount, currency);
     const totalAvailableCUP = cupBalance + (usdBalance * rateUSD);
 
@@ -428,10 +439,10 @@ async function buildCrossCurrencyDebitPlan(user, amount, currency) {
     };
 }
 
-async function buildRealBalanceDebitPlan(user, amount, currency) {
+async function buildRealBalanceDebitPlan(user, amount, currency, rateUSDOverride = null) {
     const cupBalance = parseFloat(user?.cup) || 0;
     const usdBalance = parseFloat(user?.usd) || 0;
-    const rateUSD = await getExchangeRateUSD();
+    const rateUSD = rateUSDOverride || await getExchangeRateUSD();
     const parsedAmount = parseFloat(amount) || 0;
 
     if (currency === 'USD') {
@@ -461,7 +472,7 @@ async function buildRealBalanceDebitPlan(user, amount, currency) {
         };
     }
 
-    return buildCrossCurrencyDebitPlan(user, parsedAmount, currency);
+    return buildCrossCurrencyDebitPlan(user, parsedAmount, currency, rateUSDOverride);
 }
 
 // ========== FUNCIÓN GETORCREATEUSER CON MANEJO DE ERROR DE COLUMNA ==========
@@ -2123,6 +2134,7 @@ app.post('/api/bets', async (req, res) => {
     if (!userId || !lottery || !betType || !rawText) {
         return res.status(400).json({ error: 'Faltan datos' });
     }
+    return await withUserBetLock(userId, async () => {
 
     if (sessionId) {
         const { data: activeSession } = await supabase
@@ -2709,6 +2721,7 @@ app.post('/api/bets', async (req, res) => {
     }
     const updatedUser = await getOrCreateUser(parseInt(userId));
     res.json({ success: true, bet, updatedUser });
+    });
 });
 
 // Revertir bono migrado si el referidor quedó por debajo del umbral
@@ -4231,10 +4244,9 @@ app.post('/api/admin/pending-withdraws/:id/approve', requireAdmin, async (req, r
 
     const { data: request, error: fetchError } = await supabase
         .from('withdraw_requests')
-        .update({ status: 'approved', processed_at: new Date(), processed_by: parseInt(userId) })
+        .select('*')
         .eq('id', id)
         .eq('status', 'pending')
-        .select()
         .single();
 
     if (fetchError || !request) {
@@ -4242,13 +4254,19 @@ app.post('/api/admin/pending-withdraws/:id/approve', requireAdmin, async (req, r
     }
 
     const user = await getOrCreateUser(request.user_id);
-    const debitPlan = await buildRealBalanceDebitPlan(user, parseFloat(request.amount), request.currency);
+    const originalRate = (request.amount_usd > 0) ? (parseFloat(request.amount) / parseFloat(request.amount_usd)) : null;
+    const debitPlan = await buildRealBalanceDebitPlan(user, parseFloat(request.amount), request.currency, originalRate);
     if (!debitPlan.ok) {
         return res.status(400).json({ error: debitPlan.errorMessage || '❌ Saldo insuficiente (posible cambio de tasa). Rechace la solicitud.' });
     }
 
     let newCup = (parseFloat(user.cup) || 0) - debitPlan.cupDebit;
     let newUsd = (parseFloat(user.usd) || 0) - debitPlan.usdDebit;
+
+    await supabase
+        .from('withdraw_requests')
+        .update({ status: 'approved', processed_at: new Date(), processed_by: parseInt(userId) })
+        .eq('id', id);
 
     await supabase
         .from('users')
@@ -5577,16 +5595,22 @@ app.post('/api/admin/pending-withdraws-role/:id/approve', async (req, res) => {
     }
     const { id } = req.params;
     const { data: request, error: fetchError } = await supabase
-        .from('withdraw_requests').update({ status: 'approved', processed_at: new Date(), processed_by: parseInt(userId) })
-        .eq('id', id).eq('status', 'pending').select().single();
+        .from('withdraw_requests').select('*')
+        .eq('id', id).eq('status', 'pending').single();
     if (fetchError || !request) return res.status(404).json({ error: 'Solicitud no encontrada o ya procesada' });
 
     const user = await getOrCreateUser(request.user_id);
-    const debitPlan = await buildRealBalanceDebitPlan(user, parseFloat(request.amount), request.currency);
+    const originalRate = (request.amount_usd > 0) ? (parseFloat(request.amount) / parseFloat(request.amount_usd)) : null;
+    const debitPlan = await buildRealBalanceDebitPlan(user, parseFloat(request.amount), request.currency, originalRate);
     if (!debitPlan.ok) return res.status(400).json({ error: debitPlan.errorMessage || '❌ Saldo insuficiente' });
 
     let newCup = (parseFloat(user.cup) || 0) - debitPlan.cupDebit;
     let newUsd = (parseFloat(user.usd) || 0) - debitPlan.usdDebit;
+
+    await supabase
+        .from('withdraw_requests').update({ status: 'approved', processed_at: new Date(), processed_by: parseInt(userId) })
+        .eq('id', id);
+
     await supabase.from('users').update({ cup: newCup, usd: newUsd, updated_at: new Date() }).eq('telegram_id', request.user_id);
 
     try {
