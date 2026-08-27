@@ -16,6 +16,7 @@
 
 require('dotenv').config();
 const fs = require('fs');
+const crypto = require('crypto');
 const { Telegraf, Markup } = require('telegraf');
 const { message } = require('telegraf/filters');
 const LocalSession = require('telegraf-session-local');
@@ -129,7 +130,7 @@ function isAdmin(userId) {
 }
 
 // ========== SISTEMA DE ROLES ADMINISTRATIVOS ==========
-let botRolesCache = { withdrawApprovers: [], depositApprovers: [], scheduleManagers: [], userManagers: [], userDeleters: [], activitySelf: [], lastFetch: 0 };
+let botRolesCache = { withdrawApprovers: [], depositApprovers: [], scheduleManagers: [], userManagers: [], userDeleters: [], activitySelf: [], sessionExporters: [], lastFetch: 0 };
 const BOT_ROLES_CACHE_TTL = 60000;
 
 async function refreshBotRolesCache() {
@@ -141,6 +142,7 @@ async function refreshBotRolesCache() {
         botRolesCache.userManagers = data?.filter(r => r.role === 'user_manager').map(r => Number(r.telegram_id)) || [];
         botRolesCache.userDeleters = data?.filter(r => r.role === 'user_deleter').map(r => Number(r.telegram_id)) || [];
         botRolesCache.activitySelf = data?.filter(r => r.role === 'activity_self').map(r => Number(r.telegram_id)) || [];
+        botRolesCache.sessionExporters = data?.filter(r => r.role === 'session_exporter').map(r => Number(r.telegram_id)) || [];
         botRolesCache.lastFetch = Date.now();
     } catch (e) {
         console.error('Error refreshing bot roles cache:', e);
@@ -162,6 +164,7 @@ async function hasRole(userId, role) {
         case 'user_manager': return botRolesCache.userManagers.includes(id);
         case 'user_deleter': return botRolesCache.userDeleters.includes(id);
         case 'activity_self': return botRolesCache.activitySelf.includes(id);
+        case 'session_exporter': return botRolesCache.sessionExporters.includes(id);
         default: return false;
     }
 }
@@ -174,7 +177,8 @@ function hasAnyRole(userId) {
            botRolesCache.scheduleManagers.includes(id) ||
            botRolesCache.userManagers.includes(id) ||
            botRolesCache.userDeleters.includes(id) ||
-           botRolesCache.activitySelf.includes(id);
+           botRolesCache.activitySelf.includes(id) ||
+           botRolesCache.sessionExporters.includes(id);
 }
 
 refreshBotRolesCache();
@@ -211,6 +215,16 @@ function escapeHTML(text) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// ========== EXPORTACIÓN DE JUGADAS DE SESIÓN (ENLACE FIRMADO ==========
+function getSessionExportToken(sessionId) {
+    return crypto.createHmac('sha256', BOT_TOKEN).update(String(sessionId)).digest('hex');
+}
+
+function buildSessionExportUrl(sessionId, download = false) {
+    const token = getSessionExportToken(sessionId);
+    return `${WEBAPP_URL}/export-session/${sessionId}?token=${token}${download ? '&download=1' : ''}`;
 }
 
 async function getBonusCupDefault() {
@@ -3542,6 +3556,27 @@ bot.action(/toggle_session_(\d+)_(.+)/, async (ctx) => {
                 `❌ Ya no se reciben más apuestas para esta sesión.\n` +
                 `🔢 Pronto anunciaremos el número ganador. ¡Mantente atento!`
             );
+
+            // Notificación con botón de ver apuestas (solo subadmins con privilegio) - cierre manual
+            try {
+                await ensureBotRolesCache();
+                for (const adminId of botRolesCache.sessionExporters) {
+                    try {
+                        await bot.telegram.sendMessage(adminId,
+                            `📊 <b>Jugadas</b>\n\n` +
+                            `🎰 ${region?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> · <b>${escapeHTML(session.time_slot)}</b>\n` +
+                            `📅 ${session.date}\n\n` +
+                            `Pulsa el botón para ver las apuestas de la sesión.`,
+                            {
+                                parse_mode: 'HTML',
+                                reply_markup: Markup.inlineKeyboard([
+                                    [Markup.button.url('👁️ Ver apuestas de la sesión', buildSessionExportUrl(session.id))]
+                                ]).reply_markup
+                            }
+                        );
+                    } catch (e) {}
+                }
+            } catch (e) {}
         }
 
         await ctx.answerCbQuery(newStatus === 'open' ? '✅ Sesión abierta' : '🔴 Sesión cerrada');
