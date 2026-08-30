@@ -1981,10 +1981,13 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         `¡Buena suerte! 🍀`;
     if (typeof bonusUsed !== 'undefined' && bonusUsed > 0) {
         const remainingBonus = bonusBalance - bonusUsed;
+        const esUnSoloCup = Math.abs(bonusUsed - 1) < 1e-6;
+        const verboBono = esUnSoloCup ? 'Se usó' : 'Se usaron';
+        const articuloBono = esUnSoloCup ? 'el ' : 'los ';
         if (remainingBonus === 0) {
-            confirmMsg += `\n\n🎁 Se usaron los ${bonusUsed.toFixed(2)} CUP de tu bono.`;
+            confirmMsg += `\n\n🎁 ${verboBono} ${articuloBono}${bonusUsed.toFixed(2)} CUP de tu bono.`;
         } else {
-            confirmMsg += `\n\n🎁 Se usaron ${bonusUsed.toFixed(2)} CUP de tu bono.`;
+            confirmMsg += `\n\n🎁 ${verboBono} ${bonusUsed.toFixed(2)} CUP de tu bono.`;
         }
     }
     if (arguments[1] && arguments[1].clamped) {
