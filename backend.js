@@ -268,6 +268,11 @@ function turnPlainName(slot) {
     return String(slot || '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim();
 }
 
+function lotteryEmoji(lottery) {
+    const hit = regionMap[lottery] || Object.values(regionMap).find(r => r.key === String(lottery || '').toLowerCase());
+    return hit ? hit.emoji : '🎰';
+}
+
 function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
     // Filas de la tabla (todo el texto del usuario se escapa)
     const rows = (bets || []).map(bet => {
@@ -312,25 +317,26 @@ function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
     th { background: #111827; color: #fff; position: sticky; top: 0; }
     tr:nth-child(even) { background: #f9fafb; }
     .num { text-align: right; }
-    .empty { text-align: center; padding: 24px; color: #6b7280; }
+    .empty { text-align: center; padding: 32px 24px; color: #6b7280; font-size: 15px; background: #fff; border-radius: 10px; margin-top: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .user-sub { font-size: 11px; color: #4b5563; }
     .download { display: block; margin-top: 16px; text-align: center; background: #2563eb; color: #fff; padding: 12px 16px; border-radius: 8px; text-decoration: none; font-size: 15px; }
 </style>
 </head>
 <body>
-    <h1>🎰 ${escapeHTML(session.lottery)} — ${escapeHTML(turnoTitle)}</h1>
+    <h1>${lotteryEmoji(session.lottery)} ${escapeHTML(session.lottery)} — ${escapeHTML(turnoTitle)}</h1>
     <p class="sub">📅 ${escapeHTML(session.date)} · ${(bets || []).length} apuestas</p>
-    <div class="total">💰 Total: $${totalCup.toFixed(2)} CUP / $${totalUsd.toFixed(2)} USD</div>
+    ${vacio ? `<div class="empty">😴 No hubo apuestas en esta sesión</div>` : `
+    <div class="total">💰 Total: ${totalCup.toFixed(2)} CUP / ${totalUsd.toFixed(2)} USD</div>
     <div class="wrap">
         <table>
             <thead>
                 <tr><th>Usuario</th><th>Tipo</th><th>Jugadas</th><th class="num">CUP</th><th class="num">USD</th><th class="num">Bono</th><th>Hora</th></tr>
             </thead>
             <tbody>
-                ${vacio ? `<tr><td colspan="7" class="empty">No hay apuestas en esta sesión</td></tr>` : rows}
+                ${rows}
             </tbody>
         </table>
-    </div>
+    </div>`}
     ${showDownload ? `<a class="download" href="${escapeHTML(downloadUrl)}" download="${escapeHTML(session.lottery)}_${escapeHTML(session.time_slot)}_${escapeHTML(session.date)}.html">📥 Descargar archivo</a>` : ''}
 </body>
 </html>`;
