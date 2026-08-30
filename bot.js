@@ -4223,8 +4223,6 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
         }
     }
 
-    const winnerIds = new Set();
-
     for (const [userId, result] of userResults.entries()) {
         let totalPremioUSD = 0;
         let totalPremioCUP = 0;
@@ -4235,8 +4233,6 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
         }
 
         if (totalPremioUSD > 0 || totalPremioCUP > 0) {
-            winnerIds.add(String(userId));
-
             // Mover bono al saldo principal cuando el usuario gana
             let bonusMovedCup = 0;
             try {
@@ -4350,7 +4346,6 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
     let textFallback = 0;
 
     for (const u of allUsers || []) {
-        if (winnerIds.has(String(u.telegram_id))) continue;
         try {
             let sent = false;
             if (photoBuffer) {
