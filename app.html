@@ -5251,6 +5251,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         <button class="filter-btn bg-cyan-600 px-3 py-1 rounded-full text-sm" data-filter="withBets">Con jugadas</button>
                         <button class="filter-btn bg-orange-600 px-3 py-1 rounded-full text-sm" data-filter="onlyId">Solo con ID</button>
                         <button class="filter-btn bg-red-700 px-3 py-1 rounded-full text-sm" data-filter="banned">🚫 Baneados</button>
+                        <button class="filter-btn bg-red-900 px-3 py-1 rounded-full text-sm" data-filter="blocked">🔒 Bloquearon el bot</button>
                         <button class="filter-btn bg-gray-700 px-3 py-1 rounded-full text-sm" data-filter="deleted">🗑 Eliminados</button>
                     </div>
                     <div class="flex justify-between items-center mb-2 text-gray-400 text-sm px-1">
@@ -5297,12 +5298,15 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         const bannedClass = isBanned ? 'opacity-60 border border-red-500' : '';
                         const bannedBadge = isBanned ? '<span class="text-red-400 text-xs ml-2">🚫 BANEADO</span>' : '';
                         const bannedAtStr = u.banned_at ? formatDate(u.banned_at) : '';
+                        const blockedAtStr = u.blocked_at ? formatDate(u.blocked_at) : '';
+                        const blockedLine = u.blocked_at ? `<p class="text-xs text-red-300 mt-1">🔒 Bloqueó el bot: ${blockedAtStr}</p>` : '';
                         cardsHtml += `<div class="bg-gray-800/60 p-4 rounded-xl cursor-pointer hover:bg-gray-700/60 transition user-card ${bannedClass}" data-userid="${u.telegram_id}" onclick="openBalanceModalWithFetch(${u.telegram_id}, '${escapeHTML(u.first_name || 'Sin nombre')}')">
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="font-bold">${escapeHTML(u.first_name || 'Usuario')} ${u.username ? '<span class="text-gray-400 text-sm">@'+escapeHTML(u.username)+'</span>' : ''}${bannedBadge}</p>
                                     <p class="text-xs text-gray-400">ID: ${u.telegram_id}</p>
                                     ${isBanned && bannedAtStr ? `<p class="text-xs text-white mt-1">🚫 Baneado: ${bannedAtStr}</p>` : ''}
+                                    ${blockedLine}
                                 </div>
                                 <div class="text-right text-sm">
                                     <p>CUP: <span class="text-cyan-300">${cup.toFixed(2)}</span></p>
@@ -5341,6 +5345,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             case 'withBets': count = allUsers.filter(u => u.has_bets === true).length; break;
                             case 'onlyId': count = allUsers.filter(u => !u.username || String(u.username).trim() === '').length; break;
                             case 'banned': count = allUsers.filter(u => u.is_banned === true).length; break;
+                            case 'blocked': count = allUsers.filter(u => u.has_blocked_bot === true).length; break;
                         }
                         const base = btn.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
                         btn.textContent = base + ' (' + count + ')';
@@ -5361,6 +5366,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     withBets: 'con jugadas',
                     onlyId: 'solo con ID',
                     banned: 'baneados',
+                    blocked: 'que bloquearon el bot',
                     deleted: 'eliminados'
                 };
 
@@ -5458,6 +5464,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                                 break;
                             case 'banned':
                                 categoryMatch = (user.is_banned === true);
+                                break;
+                            case 'blocked':
+                                categoryMatch = (user.has_blocked_bot === true);
                                 break;
                         }
                         card.style.display = categoryMatch ? '' : 'none';

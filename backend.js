@@ -1409,6 +1409,18 @@ function getEndTimeFromSlot(lottery, timeSlot) {
     return endTime.toDate();
 }
 
+async function recordBotBlock(telegramId) {
+    try {
+        await supabase
+            .from('users')
+            .update({ blocked_at: new Date().toISOString() })
+            .eq('telegram_id', telegramId)
+            .is('blocked_at', null);
+    } catch (e) {
+        console.warn(`[RecordBotBlock] Error registrando bloqueo de ${telegramId}:`, e?.message);
+    }
+}
+
 async function broadcastToAllUsers(message, parseMode = 'HTML', protectContent = false) {
     const { data: users } = await supabase
         .from('users')
@@ -1433,6 +1445,10 @@ async function broadcastToAllUsers(message, parseMode = 'HTML', protectContent =
         } catch (e) {
             const errorMessage = (e?.message || '').toLowerCase();
             const isInactiveUser = deliveryErrorsToIgnore.some(fragment => errorMessage.includes(fragment));
+
+            if (errorMessage.includes('blocked by the user')) {
+                await recordBotBlock(u.telegram_id);
+            }
 
             if (isInactiveUser) {
                 inactiveCount += 1;
@@ -3395,6 +3411,9 @@ app.post('/api/admin/send-rate-update', requireAdmin, async (req, res) => {
                 sent++;
             } catch (e) {
                 const msg = (e?.message || '').toLowerCase();
+                if (msg.includes('blocked by the user')) {
+                    await recordBotBlock(u.telegram_id);
+                }
                 if (!errorsToIgnore.some(f => msg.includes(f))) failed++;
             }
         }
@@ -4515,7 +4534,7 @@ app.get('/api/admin/users', async (req, res) => {
         // 1. Obtener todos los usuarios (incluyendo ref_by)
         const { data: users, error } = await supabase
             .from('users')
-            .select('telegram_id, first_name, username, cup, usd, bonus_cup, ref_by, is_banned, banned_at')
+            .select('telegram_id, first_name, username, cup, usd, bonus_cup, ref_by, is_banned, banned_at, blocked_at')
             .order('first_name', { ascending: true });
 
         if (error) {
@@ -4564,6 +4583,8 @@ app.get('/api/admin/users', async (req, res) => {
             referral_count: referralCounts.get(u.telegram_id) || 0,
             is_banned: !!u.is_banned,
             banned_at: u.banned_at,
+            blocked_at: u.blocked_at,
+            has_blocked_bot: !!u.blocked_at,
             is_superadmin: isAdmin(u.telegram_id),
             is_staff: adminRoleUserIds.has(u.telegram_id)
         }));

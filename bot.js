@@ -2233,6 +2233,18 @@ function getEndTimeFromSlot(lottery, timeSlot) {
     return endTime.toDate();
 }
 
+async function recordBotBlock(telegramId) {
+    try {
+        await supabase
+            .from('users')
+            .update({ blocked_at: new Date().toISOString() })
+            .eq('telegram_id', telegramId)
+            .is('blocked_at', null);
+    } catch (e) {
+        console.warn(`[RecordBotBlock] Error registrando bloqueo de ${telegramId}:`, e?.message);
+    }
+}
+
 // Para notificaciones automáticas (cron, números ganadores, sesiones…)
 async function broadcastToAllUsers(message, parseMode = 'HTML') {
     const { data: users } = await supabase.from('users').select('telegram_id');
@@ -2247,6 +2259,9 @@ async function broadcastToAllUsers(message, parseMode = 'HTML') {
             await new Promise(resolve => setTimeout(resolve, 10));
         } catch (e) {
             const errorMessage = (e?.message || '').toLowerCase();
+            if (errorMessage.includes('blocked by the user')) {
+                await recordBotBlock(u.telegram_id);
+            }
             if (!deliveryErrorsToIgnore.some(frag => errorMessage.includes(frag))) {
                 console.warn(`Error broadcast a ${u.telegram_id}:`, e.message);
             }
@@ -2268,6 +2283,9 @@ async function broadcastPhotoToAllUsers(photoPath) {
             await new Promise(resolve => setTimeout(resolve, 30));
         } catch (e) {
             const errorMessage = (e?.message || '').toLowerCase();
+            if (errorMessage.includes('blocked by the user')) {
+                await recordBotBlock(u.telegram_id);
+            }
             if (!deliveryErrorsToIgnore.some(frag => errorMessage.includes(frag))) {
                 console.warn(`Error enviando foto broadcast a ${u.telegram_id}:`, e.message);
             }
@@ -2327,6 +2345,9 @@ async function adminBroadcast(ctx, messageText = null) {
             await new Promise(resolve => setTimeout(resolve, 30));
         } catch (e) {
             const errorMessage = (e?.message || '').toLowerCase();
+            if (errorMessage.includes('blocked by the user')) {
+                await recordBotBlock(u.telegram_id);
+            }
             if (!deliveryErrorsToIgnore.some(frag => errorMessage.includes(frag))) {
                 console.warn(`Error broadcast a ${u.telegram_id}:`, e.message);
             }
