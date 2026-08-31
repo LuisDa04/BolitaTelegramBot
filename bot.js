@@ -217,14 +217,24 @@ function escapeHTML(text) {
         .replace(/'/g, '&#039;');
 }
 
-// ========== EXPORTACIÓN DE JUGADAS DE SESIÓN (ENLACE FIRMADO ==========
-function getSessionExportToken(sessionId) {
-    return crypto.createHmac('sha256', BOT_TOKEN).update(String(sessionId)).digest('hex');
+// ========== EXPORTACIÓN DE JUGADAS DE SESIÓN (ENLACE POR TOKEN ALEATORIO) ==========
+// Cada vez que se genera un enlace se crea un token aleatorio nuevo y se guarda en la BD,
+// de modo que solo el enlace más reciente de la sesión es válido.
+function generateSessionExportToken() {
+    return crypto.randomBytes(16).toString('hex');
 }
 
-function buildSessionExportUrl(sessionId, download = false) {
-    const token = getSessionExportToken(sessionId);
+function exportTokenToUrl(sessionId, token, download = false) {
     return `${WEBAPP_URL}/export-session/${sessionId}?token=${token}${download ? '&download=1' : ''}`;
+}
+
+async function buildSessionExportUrl(sessionId, download = false) {
+    const token = generateSessionExportToken();
+    await supabase
+        .from('lottery_sessions')
+        .update({ export_token: token })
+        .eq('id', sessionId);
+    return exportTokenToUrl(sessionId, token, download);
 }
 
 // Notifica a los subadmins con rol session_exporter el botón para ver las apuestas de una sesión cerrada
@@ -245,7 +255,7 @@ async function notifySessionExporters(session) {
                 {
                     parse_mode: 'HTML',
                     reply_markup: Markup.inlineKeyboard([
-                        [Markup.button.url('👁️ Ver apuestas de la sesión', buildSessionExportUrl(session.id))]
+                        [Markup.button.url('👁️ Ver apuestas de la sesión', await buildSessionExportUrl(session.id))]
                     ]).reply_markup
                 }
             );

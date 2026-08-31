@@ -246,14 +246,24 @@ function escapeHTML(text) {
         .replace(/'/g, '&#039;');
 }
 
-// ========== EXPORTACIÓN DE JUGADAS DE SESIÓN (HTML + ENLACE FIRMADO) ==========
-function getSessionExportToken(sessionId) {
-    return crypto.createHmac('sha256', BOT_TOKEN).update(String(sessionId)).digest('hex');
+// ========== EXPORTACIÓN DE JUGADAS DE SESIÓN (HTML + ENLACE POR TOKEN ALEATORIO) ==========
+// Cada vez que se genera un enlace se crea un token aleatorio nuevo y se guarda en la BD,
+// de modo que solo el enlace más reciente de la sesión es válido.
+function generateSessionExportToken() {
+    return crypto.randomBytes(16).toString('hex');
 }
 
-function buildSessionExportUrl(sessionId, download = false) {
-    const token = getSessionExportToken(sessionId);
+function exportTokenToUrl(sessionId, token, download = false) {
     return `${WEBAPP_URL}/export-session/${sessionId}?token=${token}${download ? '&download=1' : ''}`;
+}
+
+async function buildSessionExportUrl(sessionId, download = false) {
+    const token = generateSessionExportToken();
+    await supabase
+        .from('lottery_sessions')
+        .update({ export_token: token })
+        .eq('id', sessionId);
+    return exportTokenToUrl(sessionId, token, download);
 }
 
 function turnEmoji(slot) {
@@ -3571,7 +3581,7 @@ app.post('/api/admin/lottery-sessions/toggle', requireAdmin, async (req, res) =>
                     text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\nPulsa el botón para ver las apuestas de la sesión.`,
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[{ text: '👁️ Ver apuestas de la sesión', url: buildSessionExportUrl(data.id) }]]
+                        inline_keyboard: [[{ text: '👁️ Ver apuestas de la sesión', url: await buildSessionExportUrl(data.id) }]]
                     }
                 });
             } catch (e) {
@@ -3594,14 +3604,10 @@ app.get('/api/admin/lottery-sessions/closed', requireAdmin, async (req, res) => 
 });
 
 // --- Ver/descargar apuestas de una sesión (HTML) ---
-// Acceso protegido: requiere ?token= (HMAC del session id). Sin token no se puede abrir.
+// Acceso protegido: requiere ?token= (token aleatorio guardado en la BD para esa sesión).
 app.get('/export-session/:sessionId', async (req, res) => {
     const sessionId = req.params.sessionId;
-    const expected = getSessionExportToken(sessionId);
     const token = req.query.token;
-    if (!token || token !== expected) {
-        return res.status(403).send('<!DOCTYPE html><html lang="es"><body style="font-family:sans-serif;text-align:center;padding:40px">⛔ <b>No autorizado</b></body></html>');
-    }
 
     const { data: session } = await supabase
         .from('lottery_sessions')
@@ -3611,6 +3617,10 @@ app.get('/export-session/:sessionId', async (req, res) => {
 
     if (!session) return res.status(404).send('Sesión no encontrada');
 
+    if (!token || !session.export_token || token !== session.export_token) {
+        return res.status(403).send('<!DOCTYPE html><html lang="es"><body style="font-family:sans-serif;text-align:center;padding:40px">⛔ <b>Enlace no autorizado o expirado</b></body></html>');
+    }
+
     const { data: bets } = await supabase
         .from('bets')
         .select('*, users:user_id(first_name, username), referrers:referrer_id(first_name, username)')
@@ -3618,7 +3628,8 @@ app.get('/export-session/:sessionId', async (req, res) => {
         .order('placed_at', { ascending: true });
 
     const download = req.query.download === '1';
-    const downloadUrl = buildSessionExportUrl(sessionId, true);
+    // El enlace de descarga reutiliza el mismo token ya validado (no invalida la apertura)
+    const downloadUrl = exportTokenToUrl(sessionId, session.export_token, true);
     const html = generateSessionHtml(session, bets || [], downloadUrl, !download);
 
     if (download) {
@@ -3639,7 +3650,7 @@ app.get('/api/admin/session-export-url', requireAdmin, async (req, res) => {
             .eq('id', sessionId)
             .maybeSingle();
         if (!data) return res.status(404).json({ error: 'La sesión no existe' });
-        res.json({ url: buildSessionExportUrl(data.id), session: data });
+        res.json({ url: await buildSessionExportUrl(data.id), session: data });
         return;
     }
 
@@ -3656,7 +3667,7 @@ app.get('/api/admin/session-export-url', requireAdmin, async (req, res) => {
 
     if (!data) return res.status(404).json({ error: 'No hay sesiones cerradas para esta lotería' });
 
-    res.json({ url: buildSessionExportUrl(data.id), session: data });
+    res.json({ url: await buildSessionExportUrl(data.id), session: data });
 });
 
 // --- Obtener números ganadores publicados ---
