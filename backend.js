@@ -3574,15 +3574,24 @@ app.post('/api/admin/lottery-sessions/toggle', requireAdmin, async (req, res) =>
 
         // Notificación con botón de ver apuestas (solo subadmins con privilegio) - cierre manual
         const { data: rolesData } = await supabase.from('admin_roles').select('telegram_id').eq('role', 'session_exporter');
+        const { count: betCount } = await supabase
+            .from('bets')
+            .select('*', { count: 'exact', head: true })
+            .eq('session_id', data.id);
+        const hasBets = (betCount || 0) > 0;
         for (const r of rolesData || []) {
             try {
+                // El superadmin siempre recibe el botón; el subadmin solo si hay apuestas,
+                // de lo contrario recibe el mensaje sin botón y con el aviso de que no hay apuestas.
+                const isSuper = ADMIN_IDS.includes(Number(r.telegram_id));
+                const showButton = isSuper || hasBets;
                 await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     chat_id: Number(r.telegram_id),
-                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\nPulsa el botón para ver las apuestas de la sesión.`,
+                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\n${showButton ? 'Pulsa el botón para ver las apuestas de la sesión.' : '📭 No hay apuestas en esta sesión.'}`,
                     parse_mode: 'HTML',
-                    reply_markup: {
+                    reply_markup: showButton ? {
                         inline_keyboard: [[{ text: '👁️ Ver apuestas de la sesión', url: await buildSessionExportUrl(data.id) }]]
-                    }
+                    } : undefined
                 });
             } catch (e) {
                 console.error(`Error notificando session_exporter ${r.telegram_id}:`, e?.message || e);

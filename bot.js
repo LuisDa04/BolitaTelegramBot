@@ -245,20 +245,35 @@ async function notifySessionExporters(session) {
         console.error('Error refrescando cache de roles para notificar session_exporters:', e?.message || e);
     }
     const region = regionMap[session.lottery];
+    const { count } = await supabase
+        .from('bets')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', session.id);
+    const hasBets = (count || 0) > 0;
+
     for (const adminId of botRolesCache.sessionExporters) {
         try {
-            await bot.telegram.sendMessage(adminId,
+            // El superadmin siempre recibe el botón; el subadmin solo si hay apuestas,
+            // de lo contrario recibe el mensaje sin botón y con el aviso de que no hay apuestas.
+            const isSuper = ADMIN_IDS.includes(Number(adminId));
+            const showButton = isSuper || hasBets;
+
+            const text =
                 `📊 <b>Jugadas</b>\n\n` +
                 `🎰 ${region?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> · <b>${escapeHTML(session.time_slot)}</b>\n` +
                 `📅 ${session.date}\n\n` +
-                `Pulsa el botón para ver las apuestas de la sesión.`,
-                {
-                    parse_mode: 'HTML',
-                    reply_markup: Markup.inlineKeyboard([
+                (showButton
+                    ? `Pulsa el botón para ver las apuestas de la sesión.`
+                    : `📭 No hay apuestas en esta sesión.`);
+
+            await bot.telegram.sendMessage(adminId, text, {
+                parse_mode: 'HTML',
+                reply_markup: showButton
+                    ? Markup.inlineKeyboard([
                         [Markup.button.url('👁️ Ver apuestas de la sesión', await buildSessionExportUrl(session.id))]
                     ]).reply_markup
-                }
-            );
+                    : undefined
+            });
         } catch (e) {
             console.error(`Error notificando session_exporter ${adminId}:`, e?.message || e);
         }
