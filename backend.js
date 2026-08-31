@@ -325,7 +325,7 @@ function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
 <body>
     <h1>${lotteryEmoji(session.lottery)} ${escapeHTML(session.lottery)} — ${escapeHTML(turnoTitle)}</h1>
     <p class="sub">📅 ${escapeHTML(session.date)} · ${(bets || []).length} apuestas</p>
-    ${vacio ? `<div class="empty">😴 No hubo apuestas en esta sesión</div>` : `
+    ${vacio ? `<div class="empty">ℹ️ No hubo jugadas en esta sesión</div>` : `
     <div class="total">💰 Total: ${totalCup.toFixed(2)} CUP / ${totalUsd.toFixed(2)} USD</div>
     <div class="wrap">
         <table>
@@ -2235,16 +2235,17 @@ app.post('/api/bets', async (req, res) => {
     }
     return await withUserBetLock(userId, async () => {
 
-    if (sessionId) {
-        const { data: activeSession } = await supabase
-            .from('lottery_sessions')
-            .select('*')
-            .eq('id', sessionId)
-            .eq('status', 'open')
-            .maybeSingle();
-        if (!activeSession) {
-            return res.status(400).json({ error: 'La sesión de juego no está activa' });
-        }
+    if (!sessionId) {
+        return res.status(400).json({ error: 'No hay una sesión de juego activa' });
+    }
+    const { data: activeSession } = await supabase
+        .from('lottery_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .eq('status', 'open')
+        .maybeSingle();
+    if (!activeSession) {
+        return res.status(400).json({ error: 'La sesión de juego no está activa' });
     }
 
     const user = await getOrCreateUser(parseInt(userId));
@@ -2703,7 +2704,7 @@ app.post('/api/bets', async (req, res) => {
 
     // Anadida la nueva variable (usdUsed)
 
-    const { data: bet, error: betError } = await supabase.from('bets').insert({ user_id: parseInt(userId), lottery, session_id: sessionId || null, bet_type: betType, raw_text: effectiveRawText, items: parsed.items, cost_usd: totalUSD, cost_cup: totalCUP, bonus_used_cup: bonusUsed, placed_at: new Date() }).select().single();
+    const { data: bet, error: betError } = await supabase.from('bets').insert({ user_id: parseInt(userId), lottery, session_id: sessionId, bet_type: betType, raw_text: effectiveRawText, items: parsed.items, cost_usd: totalUSD, cost_cup: totalCUP, bonus_used_cup: bonusUsed, placed_at: new Date() }).select().single();
     if (betError) {
         console.error('Error insertando apuesta:', betError);
         return res.status(500).json({ error: 'Error al registrar la apuesta' });
@@ -3548,7 +3549,7 @@ app.post('/api/admin/lottery-sessions/toggle', requireAdmin, async (req, res) =>
             try {
                 await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     chat_id: Number(r.telegram_id),
-                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\nℹ️ <b>Sesión cerrada manualmente</b>\n\nPulsa el botón para ver las apuestas de la sesión.`,
+                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\nPulsa el botón para ver las apuestas de la sesión.`,
                     parse_mode: 'HTML',
                     reply_markup: {
                         inline_keyboard: [[{ text: '👁️ Ver apuestas de la sesión', url: buildSessionExportUrl(data.id) }]]
@@ -3608,9 +3609,21 @@ app.get('/export-session/:sessionId', async (req, res) => {
     res.send(html);
 });
 
-// --- URL de apuestas de la última sesión cerrada de una lotería (web panel) ---
+// --- URL de apuestas de una sesión cerrada de una lotería (web panel) ---
 app.get('/api/admin/session-export-url', requireAdmin, async (req, res) => {
-    const { lottery } = req.query;
+    const { lottery, sessionId } = req.query;
+
+    if (sessionId) {
+        const { data } = await supabase
+            .from('lottery_sessions')
+            .select('id, lottery, time_slot, date')
+            .eq('id', sessionId)
+            .maybeSingle();
+        if (!data) return res.status(404).json({ error: 'La sesión no existe' });
+        res.json({ url: buildSessionExportUrl(data.id), session: data });
+        return;
+    }
+
     if (!lottery) return res.status(400).json({ error: 'Falta lottery' });
 
     const { data } = await supabase

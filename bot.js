@@ -228,21 +228,19 @@ function buildSessionExportUrl(sessionId, download = false) {
 }
 
 // Notifica a los subadmins con rol session_exporter el botón para ver las apuestas de una sesión cerrada
-// manual === true → indica que la sesión se cerró manualmente; si es false (automático) no lo indica.
-async function notifySessionExporters(session, manual = false) {
+async function notifySessionExporters(session) {
     try {
         await ensureBotRolesCache();
     } catch (e) {
         console.error('Error refrescando cache de roles para notificar session_exporters:', e?.message || e);
     }
     const region = regionMap[session.lottery];
-    const closeLine = manual ? `\nℹ️ <b>Sesión cerrada manualmente</b>` : '';
     for (const adminId of botRolesCache.sessionExporters) {
         try {
             await bot.telegram.sendMessage(adminId,
                 `📊 <b>Jugadas</b>\n\n` +
                 `🎰 ${region?.emoji || '🎰'} <b>${escapeHTML(session.lottery)}</b> · <b>${escapeHTML(session.time_slot)}</b>\n` +
-                `📅 ${session.date}${closeLine}\n\n` +
+                `📅 ${session.date}\n\n` +
                 `Pulsa el botón para ver las apuestas de la sesión.`,
                 {
                     parse_mode: 'HTML',
@@ -1860,6 +1858,26 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         return false;
     }
 
+    // Re-verificar que la sesión siga abierta en la base (el admin o el cron
+    // pudieron cerrarla después de elegir la lotería). Evita apostar contra una
+    // sesión ya cerrada o no vinculadas a la misma.
+    if (!playSessionId) {
+        await ctx.reply('❌ No se encontró la sesión de juego activa. Por favor inicia de nuevo con 🎲 Jugar.', getMainKeyboard(ctx));
+        if (session) delete session.pendingBetOverride;
+        return false;
+    }
+    const { data: stillOpen, error: openErr } = await supabase
+        .from('lottery_sessions')
+        .select('id')
+        .eq('id', playSessionId)
+        .eq('status', 'open')
+        .maybeSingle();
+    if (openErr || !stillOpen) {
+        await ctx.reply('❌ La sesión de juego ya se cerró. Ya no se aceptan apuestas.', getMainKeyboard(ctx));
+        if (session) delete session.pendingBetOverride;
+        return false;
+    }
+
     // Preparar objeto de actualización sólo con las monedas que cambian
     const updates = { updated_at: new Date() };
     let bonusUsed = 0;
@@ -1875,8 +1893,6 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         }
     }
     if (totalUSD > 0) updates.usd = Math.max(0, usdBalance - totalUSD);
-
-    await supabase.from('users').update(updates).eq('telegram_id', uid);
 
     // Guardar la jugada
     const { data: betInserted, error: betError } = await supabase
@@ -1901,6 +1917,13 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         await ctx.reply('❌ Error al registrar la jugada. Por favor, intenta de nuevo más tarde.', getMainKeyboard(ctx));
         if (session) delete session.pendingBetOverride;
         return false;
+    }
+
+    // Descontar el saldo SOLO después de que la jugada quedó guardada
+    const { error: userUpdateError } = await supabase.from('users').update(updates).eq('telegram_id', uid);
+    if (userUpdateError) {
+        console.error('Error descontando saldo tras guardar jugada:', userUpdateError);
+        await ctx.reply('⚠️ Tu jugada fue registrada, pero ocurrió un error al descontar el saldo. Contacta al administrador.', getMainKeyboard(ctx));
     }
 
     //---------- Cambios hechos por Luis David -----------//
@@ -3591,7 +3614,7 @@ bot.action(/toggle_session_(\d+)_(.+)/, async (ctx) => {
             );
 
             // Notificación con botón de ver apuestas (solo subadmins con privilegio) - cierre manual
-            await notifySessionExporters(session, true);
+            await notifySessionExporters(session);
         }
 
         await ctx.answerCbQuery(newStatus === 'open' ? '✅ Sesión abierta' : '🔴 Sesión cerrada');
