@@ -3801,6 +3801,10 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
 
     if (!session) return res.status(404).json({ error: 'Sesión no encontrada' });
 
+    if (session.status !== 'closed') {
+        return res.status(400).json({ error: 'La sesión debe estar cerrada para publicar sus resultados' });
+    }
+
     const { data: existingWin } = await supabase
         .from('winning_numbers')
         .select('id')

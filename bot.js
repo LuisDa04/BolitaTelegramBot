@@ -4125,6 +4125,11 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
         return false;
     }
 
+    if (session.status !== 'closed') {
+        await logReply('❌ La sesión debe estar CERRADA para publicar sus resultados.');
+        return false;
+    }
+
     const { data: existingWin } = await supabase
         .from('winning_numbers')
         .select('id')
@@ -4468,7 +4473,7 @@ function parseChannelResultBlocks(html) {
     return results;
 }
 
-async function fetchChannelWinningNumber(lotteryKey, channel, minTime, maxTime, retries = 2, baseDelay = 2000) {
+async function fetchChannelWinningNumber(lotteryKey, channel, minTime, maxTime, referenceTime = null, excludeTimes = null, retries = 2, baseDelay = 2000) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
             console.log(`[AutoPublish] Scraping @${channel} (intento ${attempt}/${retries})...`);
@@ -4489,12 +4494,22 @@ async function fetchChannelWinningNumber(lotteryKey, channel, minTime, maxTime, 
 
             const results = parseChannelResultBlocks(resp.data);
             console.log(`[AutoPublish] Bloques encontrados en canal: ${results.length} con resultado válido`, results.length > 0 ? results.map(r => `${r.lottery}:${r.number}@${r.time}`).join(', ') : '(ninguno)');
-            const match = results.find(r =>
-                r.lottery === lotteryKey &&
-                r.time &&
-                r.time >= minTime &&
-                r.time <= maxTime
-            );
+            // Elegir el post más cercano al cierre del turno (referenceTime), nunca uno
+            // anterior al sorteo, y evitando números ya asignados a otro turno en esta
+            // misma ejecución (excludeTimes). Antes se tomaba el PRIMERO de la ventana,
+            // lo que podía acreditar a una sesión el número de un sorteo vecino.
+            const refTime = referenceTime || minTime;
+            const candidates = results
+                .filter(r =>
+                    r.lottery === lotteryKey &&
+                    r.time &&
+                    r.time >= minTime &&
+                    r.time <= maxTime &&
+                    r.time.getTime() >= refTime.getTime() &&
+                    !(excludeTimes && excludeTimes.has(r.time.getTime()))
+                )
+                .sort((a, b) => Math.abs(a.time.getTime() - refTime.getTime()) - Math.abs(b.time.getTime() - refTime.getTime()));
+            const match = candidates[0];
             if (match) {
                 console.log(`[AutoPublish] Match encontrado: ${match.lottery} ${match.number} @ ${match.time} | foto=${match.photo ? 'sí' : 'no'}`);
                 return match;
@@ -4580,6 +4595,10 @@ async function autoPublishWinningResults() {
 
         const now = Date.now();
 
+        // Números de publicaciones ya asignadas a un turno en esta ejecución, para
+        // que un mismo post del canal no se acredite a dos sesiones distintas.
+        const usedResultTimes = new Set();
+
         for (const session of sessions || []) {
             if (publishedSet.has(`${session.lottery}|${session.date}|${session.time_slot}`)) {
                 console.log(`[AutoPublish] Saltando ${session.lottery} ${session.time_slot} — ya publicado hoy.`);
@@ -4612,10 +4631,11 @@ async function autoPublishWinningResults() {
 
             if (now <= windowEnd) {
                 console.log(`[AutoPublish] Buscando ganador para ${session.lottery} ${session.time_slot} en @${channel} (ventana ${new Date(windowStart).toISOString()} - ${new Date(windowEnd).toISOString()})...`);
-                const winner = await fetchChannelWinningNumber(channelLotteryKey, channel, new Date(windowStart), new Date(windowEnd));
+                const winner = await fetchChannelWinningNumber(channelLotteryKey, channel, new Date(windowStart), new Date(windowEnd), new Date(endTime), usedResultTimes);
                 if (winner) {
                     console.log(`[AutoPublish] Ganador encontrado: ${winner.number} (lottery: ${winner.lottery}, time: ${winner.time})`);
                     const ok = await processWinningNumber(session.id, winner.number, null, winner.photo || null);
+                    if (ok && winner.time) usedResultTimes.add(winner.time.getTime());
                     console.log(`[AutoPublish] ${ok ? '✅ Publicado' : '❌ Falló publicación'}: ${session.lottery} ${session.time_slot} (${session.date}) número ${winner.number}`);
                 } else {
                     console.warn(`[AutoPublish] ⚠️ No se encontró ganador para ${session.lottery} ${session.time_slot} en @${channel} dentro de la ventana.`);
