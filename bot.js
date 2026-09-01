@@ -4852,10 +4852,33 @@ bot.on('my_chat_member', async (ctx) => {
         if (status === 'kicked') {
             await recordBotBlock(tgId);
         } else if (status === 'member') {
+            // Desbloqueo (old_chat_member kicked → member): usuario que había
+            // bloqueado el bot vuelve a entrar. Si además tiene una eliminación
+            // vigente por admin (deleted_users sin restored_at), se desmarca
+            // automáticamente: al tocar /start recibirá bienvenida + bono y no se
+            // le mostrará la redirección de "selecciona el botón Inicio".
             await supabase
                 .from('users')
                 .update({ blocked_at: null })
                 .eq('telegram_id', tgId);
+            const wasKicked = ctx.myChatMember?.old_chat_member?.status === 'kicked';
+            if (wasKicked) {
+                try {
+                    const { data: deletedRec } = await supabase
+                        .from('deleted_users')
+                        .select('telegram_id, restored_at')
+                        .eq('telegram_id', tgId)
+                        .maybeSingle();
+                    if (deletedRec && !deletedRec.restored_at) {
+                        await supabase
+                            .from('deleted_users')
+                            .update({ restored_at: new Date() })
+                            .eq('telegram_id', tgId);
+                    }
+                } catch (deletedErr) {
+                    console.warn(`[MyChatMember] Error desmarcando eliminación de ${tgId}:`, deletedErr?.message);
+                }
+            }
         }
     } catch (e) {
         console.warn(`[MyChatMember] Error procesando evento de ${ctx.myChatMember?.chat?.id}:`, e?.message);
