@@ -940,20 +940,23 @@ function normalizeParleValue(value) {
 // Desglose unificado del número ganador de 7 dígitos.
 // Los "corridos" solo salen de la cuarteta (pares consecutivos DE, EF, FG);
 // el "fijo" es el final de la centena y NO es un corrido.
+// Los "parles" conservan el comportamiento original: combinaciones de
+// [fijo, DE, FG] (fijo + primeros 2 de cuarteta + últimos 2 de cuarteta).
 function descomponerNumeroGanador(numStr) {
     const clean = String(numStr || '').replace(/\s+/g, '');
     const centena = clean.slice(0, 3);
     const cuarteta = clean.slice(3);
     const fijo = centena.slice(1);
-    const corridos = [
-        cuarteta.slice(0, 2),
-        cuarteta.slice(1, 3),
-        cuarteta.slice(2)
-    ];
+    const de = cuarteta.slice(0, 2);
+    const ef = cuarteta.slice(1, 3);
+    const fg = cuarteta.slice(2);
+    // Corridos (apuesta "corridos"): solo cuarteta, pares consecutivos.
+    const corridos = [de, ef, fg];
+    // Parles (apuesta "parle"): combinaciones de [fijo, de, fg] (comportamiento original).
     const parles = [
-        `${corridos[0]}x${corridos[1]}`,
-        `${corridos[0]}x${corridos[2]}`,
-        `${corridos[1]}x${corridos[2]}`
+        `${fijo}x${de}`,
+        `${fijo}x${fg}`,
+        `${de}x${fg}`
     ];
     const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
     return { centena, cuarteta, fijo, corridos, parles, normalizedParles };
