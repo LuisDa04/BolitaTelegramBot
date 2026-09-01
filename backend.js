@@ -3630,11 +3630,42 @@ app.get('/export-session/:sessionId', async (req, res) => {
         return res.status(403).send('<!DOCTYPE html><html lang="es"><body style="font-family:sans-serif;text-align:center;padding:40px">⛔ <b>Enlace no autorizado o expirado</b></body></html>');
     }
 
-    const { data: bets } = await supabase
+    const { data: betsRaw, error: betsError } = await supabase
         .from('bets')
-        .select('*, users:user_id(first_name, username), referrers:referrer_id(first_name, username)')
+        .select('*')
         .eq('session_id', sessionId)
         .order('placed_at', { ascending: true });
+    if (betsError) {
+        console.error('Error cargando apuestas de la sesión:', betsError);
+    }
+    const bets = (betsRaw || []).map(bet => {
+        // Nota: no se usan joins de Supabase porque bets.user_id/referrer_id
+        // guardan users.telegram_id (PK no estándar), lo que rompía el select.
+        // Se resuelve el nombre del usuario/referidor con consultas separadas.
+        return {
+            ...bet,
+            users: bet.user_id != null ? (bet.users || {}) : {},
+            referrers: bet.referrer_id != null ? (bet.referrers || {}) : {}
+        };
+    });
+    // Enriquecer cada apuesta con first_name/username de users (paralelo por lote)
+    const userIds = [...new Set(bets.map(b => b.user_id).filter(v => v != null))];
+    const referrerIds = [...new Set(bets.map(b => b.referrer_id).filter(v => v != null))];
+    const nameCache = {};
+    const idsToFetch = [...new Set([...userIds, ...referrerIds])];
+    if (idsToFetch.length > 0) {
+        const { data: userRows } = await supabase
+            .from('users')
+            .select('telegram_id, first_name, username')
+            .in('telegram_id', idsToFetch);
+        (userRows || []).forEach(u => {
+            nameCache[String(u.telegram_id)] = { first_name: u.first_name, username: u.username };
+        });
+    }
+    for (const bet of bets) {
+        if (bet.user_id != null && nameCache[String(bet.user_id)]) bet.users = nameCache[String(bet.user_id)];
+        if (bet.referrer_id != null && nameCache[String(bet.referrer_id)]) bet.referrers = nameCache[String(bet.referrer_id)];
+    }
 
     const download = req.query.download === '1';
     // El enlace de descarga reutiliza el mismo token ya validado (no invalida la apertura)
