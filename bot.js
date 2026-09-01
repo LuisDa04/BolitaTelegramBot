@@ -303,6 +303,38 @@ function normalizeParleValue(value) {
     return [match[1], match[2]].sort().join('x');
 }
 
+// Desglose unificado del número ganador de 7 dígitos.
+// Los "corridos" solo salen de la cuarteta (pares consecutivos DE, EF, FG);
+// el "fijo" es el final de la centena y NO es un corrido.
+function descomponerNumeroGanador(numStr) {
+    const clean = String(numStr || '').replace(/\s+/g, '');
+    const centena = clean.slice(0, 3);
+    const cuarteta = clean.slice(3);
+    const fijo = centena.slice(1);
+    const corridos = [
+        cuarteta.slice(0, 2),
+        cuarteta.slice(1, 3),
+        cuarteta.slice(2)
+    ];
+    const parles = [
+        `${corridos[0]}x${corridos[1]}`,
+        `${corridos[0]}x${corridos[2]}`,
+        `${corridos[1]}x${corridos[2]}`
+    ];
+    const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
+    return { centena, cuarteta, fijo, corridos, parles, normalizedParles };
+}
+
+// Monto en CUP/USD de un item de apuesta (acepta {cup,usd} o {currency,amount})
+function itemMontoCup(item) {
+    if (item && item.cup !== undefined) return parseFloat(item.cup) || 0;
+    return (item && String(item.currency).toUpperCase() === 'CUP') ? (parseFloat(item.amount) || 0) : 0;
+}
+function itemMontoUsd(item) {
+    if (item && item.usd !== undefined) return parseFloat(item.usd) || 0;
+    return (item && String(item.currency).toUpperCase() === 'USD') ? (parseFloat(item.amount) || 0) : 0;
+}
+
 function formatBetTypeLabel(betType) {
     const labels = {
         fijo: 'Fijo',
@@ -4189,20 +4221,7 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
         return false;
     }
 
-    const centena = winningStr.slice(0, 3);
-    const cuarteta = winningStr.slice(3);
-    const fijo = centena.slice(1);
-    const corridos = [
-        fijo,
-        cuarteta.slice(0, 2),
-        cuarteta.slice(2)
-    ];
-    const parles = [
-        `${corridos[0]}x${corridos[1]}`,
-        `${corridos[0]}x${corridos[2]}`,
-        `${corridos[1]}x${corridos[2]}`
-    ];
-    const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
+    const { centena, cuarteta, fijo, corridos, normalizedParles } = descomponerNumeroGanador(winningStr);
 
     const { error: insertError } = await supabase
         .from('winning_numbers')
@@ -4295,8 +4314,8 @@ async function processWinningNumber(sessionId, winningStr, ctx, photoUrl = null)
             }
 
             if (ganado) {
-                const itemUsd = item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount || 0) : 0);
-                const itemCup = item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount || 0) : 0);
+                const itemUsd = itemMontoUsd(item);
+                const itemCup = itemMontoCup(item);
                 premioTotalUSD += itemUsd * multiplicador;
                 premioTotalCUP += itemCup * multiplicador;
             }

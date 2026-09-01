@@ -937,6 +937,28 @@ function normalizeParleValue(value) {
     return [match[1], match[2]].sort().join('x');
 }
 
+// Desglose unificado del número ganador de 7 dígitos.
+// Los "corridos" solo salen de la cuarteta (pares consecutivos DE, EF, FG);
+// el "fijo" es el final de la centena y NO es un corrido.
+function descomponerNumeroGanador(numStr) {
+    const clean = String(numStr || '').replace(/\s+/g, '');
+    const centena = clean.slice(0, 3);
+    const cuarteta = clean.slice(3);
+    const fijo = centena.slice(1);
+    const corridos = [
+        cuarteta.slice(0, 2),
+        cuarteta.slice(1, 3),
+        cuarteta.slice(2)
+    ];
+    const parles = [
+        `${corridos[0]}x${corridos[1]}`,
+        `${corridos[0]}x${corridos[2]}`,
+        `${corridos[1]}x${corridos[2]}`
+    ];
+    const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
+    return { centena, cuarteta, fijo, corridos, parles, normalizedParles };
+}
+
 function formatBetTypeLabel(betType) {
     const labels = {
         fijo: 'Fijo',
@@ -945,6 +967,16 @@ function formatBetTypeLabel(betType) {
         parle: 'Parlet'
     };
     return labels[String(betType || '').toLowerCase()] || (betType || 'N/D');
+}
+
+// Monto en CUP/USD de un item de apuesta (acepta {cup,usd} o {currency,amount})
+function itemMontoCup(item) {
+    if (item && item.cup !== undefined) return parseFloat(item.cup) || 0;
+    return (item && String(item.currency).toUpperCase() === 'CUP') ? (parseFloat(item.amount) || 0) : 0;
+}
+function itemMontoUsd(item) {
+    if (item && item.usd !== undefined) return parseFloat(item.usd) || 0;
+    return (item && String(item.currency).toUpperCase() === 'USD') ? (parseFloat(item.amount) || 0) : 0;
 }
 
 // Une una lista de números con "y" antes del último: [1] -> "1", [1,2] -> "1 y 2", [1,2,3] -> "1, 2 y 3"
@@ -3743,20 +3775,7 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
     }
 
     const winningStr = winning.numbers[0];
-    const centena = winningStr.slice(0, 3);
-    const cuarteta = winningStr.slice(3);
-    const fijo = centena.slice(1);
-    const corridos = [
-        fijo,
-        cuarteta.slice(0, 2),
-        cuarteta.slice(2)
-    ];
-    const parles = [
-        `${corridos[0]}x${corridos[1]}`,
-        `${corridos[0]}x${corridos[2]}`,
-        `${corridos[1]}x${corridos[2]}`
-    ];
-    const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
+    const { centena, cuarteta, fijo, corridos, normalizedParles } = descomponerNumeroGanador(winningStr);
 
     const { data: multipliers } = await supabase
         .from('play_prices')
@@ -3813,8 +3832,8 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
             }
 
             if (ganado) {
-                const itemUsd = item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount || 0) : 0);
-                const itemCup = item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount || 0) : 0);
+                const itemUsd = itemMontoUsd(item);
+                const itemCup = itemMontoCup(item);
                 premioTotalUSD += (itemUsd || 0) * multiplicador;
                 premioTotalCUP += (itemCup || 0) * multiplicador;
             }
@@ -3887,24 +3906,7 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Esta sesión ya tiene un número ganador publicado' });
     }
 
-    const centena = cleanNumber.slice(0, 3);
-    const cuarteta = cleanNumber.slice(3);
-    const fijo = centena.slice(1);
-    const corrido1 = cuarteta.slice(0, 2);
-    const corrido2 = cuarteta.slice(2);
-    const corridos = [
-        fijo,
-        corrido1,
-        corrido2
-    ];
-    // Generar todas las combinaciones posibles de parles (ambos órdenes)
-    const parlePairs = [
-        [fijo, corrido1], [corrido1, fijo],
-        [fijo, corrido2], [corrido2, fijo],
-        [corrido1, corrido2], [corrido2, corrido1]
-    ];
-    const parles = parlePairs.map(([a, b]) => `${a}x${b}`);
-    const normalizedParles = new Set(parles.map(normalizeParleValue).filter(Boolean));
+    const { centena, cuarteta, fijo, corridos, normalizedParles } = descomponerNumeroGanador(cleanNumber);
 
     const { error: insertError } = await supabase
         .from('winning_numbers')
@@ -3998,8 +4000,8 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
             }
 
             if (ganado) {
-                const itemUsd = item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount || 0) : 0);
-                const itemCup = item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount || 0) : 0);
+                const itemUsd = itemMontoUsd(item);
+                const itemCup = itemMontoCup(item);
                 premioTotalUSD += (itemUsd || 0) * multiplicador;
                 premioTotalCUP += (itemCup || 0) * multiplicador;
             }
