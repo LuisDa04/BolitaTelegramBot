@@ -264,7 +264,7 @@ async function notifySessionExporters(session) {
                 `📅 ${session.date}\n\n` +
                 (showButton
                     ? `Pulsa el botón para ver las apuestas de la sesión.`
-                    : `📭 No hay apuestas en esta sesión.`);
+                    : `📭 No hubo apuestas en esta sesión.`);
 
             await bot.telegram.sendMessage(adminId, text, {
                 parse_mode: 'HTML',
