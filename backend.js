@@ -324,7 +324,7 @@ function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
     .wrap { background: #fff; border-radius: 10px; overflow-x: auto; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     table { width: 100%; border-collapse: collapse; min-width: 560px; }
     th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 13px; white-space: nowrap; }
-    th { background: #111827; color: #fff; position: sticky; top: 0; }
+    th { background: #111827; color: #fff; }
     tr:nth-child(even) { background: #f9fafb; }
     .num { text-align: right; }
     .empty { text-align: center; padding: 32px 24px; color: #6b7280; font-size: 15px; background: #fff; border-radius: 10px; margin-top: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -3711,6 +3711,7 @@ app.get('/export-session/:sessionId', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="${session.lottery.replace(/\s+/g, '_')}_${(session.time_slot || '').replace(/[^\w]/g, '')}_${session.date}.html"`);
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(html);
 });
 
