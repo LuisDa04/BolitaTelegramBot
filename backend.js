@@ -296,7 +296,7 @@ function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
                 <span class="user-name">${escapeHTML(user.first_name || user.username || String(bet.user_id))}</span><br>
                 <span class="user-sub">${escapeHTML(userRef)}</span>
             </td>
-            <td>${escapeHTML(bet.bet_type || '')}</td>
+            <td>${escapeHTML(formatBetTypeLabel(bet.bet_type))}</td>
             <td>${escapeHTML(bet.raw_text || '')}</td>
             <td class="num">${(parseFloat(bet.cost_cup) || 0).toFixed(2)}</td>
             <td class="num">${(parseFloat(bet.cost_usd) || 0).toFixed(2)}</td>
