@@ -254,10 +254,45 @@ function generateSessionExportToken() {
 }
 
 function exportTokenToUrl(sessionId, token, download = false) {
-    return `${WEBAPP_URL}/export-session/${sessionId}?token=${token}${download ? '&download=1' : ''}`;
+    const key = getBotUsernameParam();
+    return `${WEBAPP_URL}/export-session/${sessionId}?${key}=${token}${download ? '&download=1' : ''}`;
+}
+
+// Nombre de parámetro del enlace de apuestas: usa el username real del bot
+// (sincronizado vía getMe) para ocultar la palabra "token" del enlace.
+function getBotUsernameParam() {
+    if (botInfo && botInfo.username) return botInfo.username;
+    return 'bot';
+}
+
+// Garantiza que botInfo.username esté resuelto (vía getMe) antes de generar
+// un enlace de apuestas, para que el nombre de parámetro sea el real del bot
+// y no el fallback 'bot'. Si ya se resolvió, no vuelve a llamar a la API.
+let botInfoResolved = false;
+let botInfoPromise = null;
+async function ensureBotInfo() {
+    if (botInfoResolved) return botInfo;
+    if (!botInfoPromise) {
+        botInfoPromise = (async () => {
+            try {
+                if (bot && bot.telegram && typeof bot.telegram.getMe === 'function') {
+                    const info = await bot.telegram.getMe();
+                    if (info && info.username) {
+                        botInfo = info;
+                        botInfoResolved = true;
+                    }
+                }
+            } catch (e) {
+                console.error('Error resolviendo botInfo en ensureBotInfo:', e?.message || e);
+            }
+            return botInfo;
+        })();
+    }
+    return botInfoPromise;
 }
 
 async function buildSessionExportUrl(sessionId, download = false) {
+    await ensureBotInfo();
     const token = generateSessionExportToken();
     await supabase
         .from('lottery_sessions')
@@ -3651,7 +3686,7 @@ app.get('/api/admin/lottery-sessions/closed', requireAdmin, async (req, res) => 
 // Acceso protegido: requiere ?token= (token aleatorio guardado en la BD para esa sesión).
 app.get('/export-session/:sessionId', async (req, res) => {
     const sessionId = req.params.sessionId;
-    const token = req.query.token;
+    const token = req.query[getBotUsernameParam()];
 
     const { data: session } = await supabase
         .from('lottery_sessions')
