@@ -4170,8 +4170,8 @@ bot.action(/publish_win_(\d+)/, async (ctx) => {
         'Se desglosará automáticamente en:\n' +
         '• Centena: primeros 3 dígitos\n' +
         '• Fijo: últimos 2 de la centena\n' +
-        '• Corridos: fijo, primeros 2 de cuarteta, últimos 2 de cuarteta\n' +
-        '• Parlet: combinaciones de los corridos',
+        '• Corridos: 3 pares consecutivos de la cuarteta (pares 1-2, 2-3 y 3-4)\n' +
+        '• Parlet: combinaciones de fijo, primeros 2 y últimos 2 de cuarteta',
         { parse_mode: 'HTML' }
     );
     await ctx.answerCbQuery();
