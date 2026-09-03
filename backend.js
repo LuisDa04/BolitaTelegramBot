@@ -293,11 +293,24 @@ async function ensureBotInfo() {
 
 async function buildSessionExportUrl(sessionId, download = false) {
     await ensureBotInfo();
-    const token = generateSessionExportToken();
-    await supabase
+
+    // Reutilizar el token existente si la sesión ya tiene uno válido, para que
+    // el primer enlace generado siga funcionando. Solo se crea uno nuevo si
+    // la sesión aún no tiene token.
+    const { data: existing } = await supabase
         .from('lottery_sessions')
-        .update({ export_token: token })
-        .eq('id', sessionId);
+        .select('export_token')
+        .eq('id', sessionId)
+        .single();
+
+    let token = existing?.export_token || null;
+    if (!token) {
+        token = generateSessionExportToken();
+        await supabase
+            .from('lottery_sessions')
+            .update({ export_token: token })
+            .eq('id', sessionId);
+    }
     return exportTokenToUrl(sessionId, token, download);
 }
 
@@ -3875,6 +3888,28 @@ app.get('/api/admin/winning-numbers/:sessionId/winners', requireAdmin, async (re
                 const itemCup = itemMontoCup(item);
                 premioTotalUSD += (itemUsd || 0) * multiplicador;
                 premioTotalCUP += (itemCup || 0) * multiplicador;
+                console.log('[ValGanador] GANÓ', {
+                    session: sessionId,
+                    winning: winningStr,
+                    user: bet.user_id,
+                    bet_type: bet.bet_type,
+                    numero,
+                    ganado: true,
+                    montoUsd: itemUsd,
+                    montoCup: itemCup,
+                    corridos,
+                    fijo,
+                    centena
+                });
+            } else {
+                console.log('[ValGanador] NO ganó', {
+                    session: sessionId,
+                    winning: winningStr,
+                    user: bet.user_id,
+                    bet_type: bet.bet_type,
+                    numero,
+                    ganado: false
+                });
             }
         }
 
@@ -4043,6 +4078,28 @@ app.post('/api/admin/winning-numbers', requireAdmin, async (req, res) => {
                 const itemCup = itemMontoCup(item);
                 premioTotalUSD += (itemUsd || 0) * multiplicador;
                 premioTotalCUP += (itemCup || 0) * multiplicador;
+                console.log('[ValGanador] GANÓ', {
+                    session: sessionId,
+                    winning: formatted,
+                    user: bet.user_id,
+                    bet_type: bet.bet_type,
+                    numero,
+                    ganado: true,
+                    montoUsd: itemUsd,
+                    montoCup: itemCup,
+                    corridos,
+                    fijo,
+                    centena
+                });
+            } else {
+                console.log('[ValGanador] NO ganó', {
+                    session: sessionId,
+                    winning: formatted,
+                    user: bet.user_id,
+                    bet_type: bet.bet_type,
+                    numero,
+                    ganado: false
+                });
             }
         }
 
