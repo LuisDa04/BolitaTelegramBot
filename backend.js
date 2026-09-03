@@ -3481,7 +3481,7 @@ app.post('/api/admin/send-rate-update', requireAdmin, async (req, res) => {
         const timeStr = now.format('h:mm A');
         const lines = [
             '💹 Tasas de Cambio del Día',
-            `🕐 Actualizado por ADMIN: ${dateStr} ${timeStr}`,
+            `🕐 Actualizado por ADMIN: 📅 ${dateStr} ${timeStr}`,
             '',
             'Mercado Informal',
             `💵 USD: ${rate.toFixed(2)} CUP${formatRateDelta(prev ? rate - prev.rate : null)}`,
