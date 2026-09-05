@@ -351,8 +351,9 @@ function normalizeParleValue(value) {
 }
 
 // Desglose unificado del número ganador de 7 dígitos.
-// Los "corridos" solo salen de la cuarteta (pares consecutivos DE, EF, FG);
-// el "fijo" es el final de la centena y NO es un corrido.
+// Los "corridos" solo salen de los EXTREMOS de la cuarteta (DE y FG);
+// el par intermedio (EF) NO es un corrido y el "fijo" es el final de la
+// centena y NO es un corrido.
 // Los "parles" conservan el comportamiento original: combinaciones de
 // [fijo, DE, FG] (fijo + primeros 2 de cuarteta + últimos 2 de cuarteta).
 function descomponerNumeroGanador(numStr) {
@@ -363,8 +364,8 @@ function descomponerNumeroGanador(numStr) {
     const de = cuarteta.slice(0, 2);
     const ef = cuarteta.slice(1, 3);
     const fg = cuarteta.slice(2);
-    // Corridos (apuesta "corridos"): solo cuarteta, pares consecutivos.
-    const corridos = [de, ef, fg];
+    // Corridos (apuesta "corridos"): solo extremos de la cuarteta (DE y FG).
+    const corridos = [de, fg];
     // Parles (apuesta "parle"): combinaciones de [fijo, de, fg] (comportamiento original).
     const parles = [
         `${fijo}x${de}`,
