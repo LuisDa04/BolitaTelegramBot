@@ -4031,7 +4031,8 @@ bot.action('adm_send_rate_update', async (ctx) => {
 
         const lines = [
             '💹 Tasas de Cambio del Día',
-            `🕐 Actualizado por ADMIN: 📅 ${dateStr} ${timeStr}`,
+            '🕐 Actualizado por ADMIN:',
+            `📅 ${dateStr} ${timeStr}`,
             '',
             'Mercado Informal',
         ];
@@ -7595,7 +7596,8 @@ cron.schedule('0 8 * * *', async () => {
         const prev = bot.lastBroadcastRates;
         const lines = [
             '💹 Tasas de Cambio del Día',
-            `🕐 ${fetchOk ? 'Actualizado en tiempo real' : 'Últimas tasas disponibles'}: 📅 ${dateStr} ${timeStr}`,
+            `🕐 ${fetchOk ? 'Actualizado en tiempo real' : 'Últimas tasas disponibles'}:`,
+            `📅 ${dateStr} ${timeStr}`,
             'Fuente: eltoque.com',
             '',
             'Mercado Informal',
