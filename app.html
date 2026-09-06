@@ -2223,7 +2223,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             betDetailModalBody.innerHTML = `
                 <h4 class="text-xl font-bold mb-2">Detalles de la jugada</h4>
                 <p class="text-sm text-gray-300 mb-1">🎰 ${escapeHTML(bet.lottery)} - ${escapeHTML(formatBetTypeLabel(bet.bet_type))}</p>
-                <p class="text-xs text-gray-400 mb-3">${new Date(bet.placed_at).toLocaleString()}</p>
+                <p class="text-xs text-gray-400 mb-3">${new Date(bet.placed_at).toLocaleString()}${bet.updated_at && new Date(bet.updated_at) - new Date(bet.placed_at) > 60000 ? `<span class="block mt-0.5 text-cyan-400/90">✏️ Editada: ${new Date(bet.updated_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}</span>` : ''}</p>
                 
                 <div class="mb-3">
                     <p class="font-semibold mb-1">${bet.bet_type === 'centena' ? '💯 Centenas jugadas:' : bet.bet_type === 'parle' ? '🔗 Parlets jugados:' : bet.bet_type === 'fijo' ? '🎯 Números jugados:' : bet.bet_type === 'corridos' ? '🏃 Números jugados:' : '📝 Números jugados:'}</p>
