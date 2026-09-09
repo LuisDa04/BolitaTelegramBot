@@ -405,7 +405,10 @@ function buildLastBetsText(bets) {
     let text = '📋 <b>Tus últimas 5 jugadas:</b>\n\n';
 
     bets.forEach((b, i) => {
-        const date = moment(b.placed_at).tz(TIMEZONE).format('DD/MM/YYYY hh:mm A');
+        const created = moment(b.placed_at).tz(TIMEZONE).format('DD/MM/YYYY hh:mm A');
+        const edited = b.updated_at && new Date(b.updated_at) - new Date(b.placed_at) > 60000
+            ? moment(b.updated_at).tz(TIMEZONE).format('hh:mm A')
+            : null;
         const lottery = escapeHTML(b.lottery || '-');
         const betType = escapeHTML(formatBetTypeLabel(b.bet_type) || '-');
         const rawTextLines = String(b.raw_text || '')
@@ -418,7 +421,9 @@ function buildLastBetsText(bets) {
         const usd = (parseFloat(b.cost_usd) || 0).toFixed(2);
 
         text += `<b>${i + 1}.</b>\n` +
-            `<pre>Lotería : ${lottery}\nTipo    : ${betType}\nJugada:\n${rawText}\nMonto   : ${cup} CUP / ${usd} USD\nFecha y Hora : ${date}</pre>\n`;
+            `<pre>Lotería    : ${lottery}\nTipo       : ${betType}\nJugada:\n${rawText}\nMonto      : ${cup} CUP / ${usd} USD\nRegistrada : ${created}` +
+            (edited ? `\nEditada    : ${edited}` : '') +
+            `</pre>\n`;
     });
 
     text += '¿Quieres ver más? Puedes consultar el historial completo en la Web-App.';
