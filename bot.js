@@ -2641,6 +2641,11 @@ bot.use(async (ctx, next) => {
             // bienvenida con cualquier interacción.
             if (ctx.session?.isNewUser) {
                 const msgText = ctx.message?.text || '';
+                // Updates sin texto (my_chat_member, etc.) no deben disparar la
+                // redirección ni la bienvenida; solo updates de mensaje/callback
+                // con contenido. Esto evita que el desbloqueo del bot (que llega
+                // antes de /start) enviar el aviso de "selecciona el botón Inicio".
+                if (!msgText) return next();
                 if (!/^\/start(?:\s|$)/.test(msgText)) {
                     if (ctx.session?.isDeletedUser) {
                         try {
