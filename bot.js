@@ -225,18 +225,19 @@ function generateSessionExportToken() {
 }
 
 function exportTokenToUrl(sessionId, token, download = false) {
-    const key = getBotUsernameParam();
+    const key = encodeURIComponent(getBotUsernameParam());
     return `${WEBAPP_URL}/export-session/${sessionId}?${key}=${token}${download ? '&download=1' : ''}`;
 }
 
-// Nombre de parámetro del enlace de apuestas: usa el username real del bot
-// (sincronizado vía getMe) para ocultar la palabra "token" del enlace.
+// Nombre de parámetro del enlace de apuestas: usa el nombre real del bot
+// (first_name de BotFather, sincronizado vía getMe) para ocultar la palabra
+// "token" del enlace. Se codifica con encodeURIComponent al armar el URL.
 function getBotUsernameParam() {
-    if (botInfo && botInfo.username) return botInfo.username;
+    if (botInfo && botInfo.first_name) return botInfo.first_name;
     return 'bot';
 }
 
-// Garantiza que botInfo.username esté resuelto (vía getMe) antes de generar
+// Garantiza que botInfo.first_name esté resuelto (vía getMe) antes de generar
 // un enlace de apuestas. Si ya se resolvió, no vuelve a llamar a la API.
 let botInfoResolved = false;
 let botInfoPromise = null;
@@ -247,7 +248,7 @@ async function ensureBotInfo() {
             try {
                 if (bot && bot.telegram && typeof bot.telegram.getMe === 'function') {
                     const info = await bot.telegram.getMe();
-                    if (info && info.username) {
+                    if (info && info.first_name) {
                         botInfo = info;
                         botInfoResolved = true;
                     }
