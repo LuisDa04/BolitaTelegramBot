@@ -395,7 +395,7 @@ function generateSessionHtml(session, bets, downloadUrl, showDownload = true) {
             </tbody>
         </table>
     </div>`}
-    ${showDownload ? `<a class="download" href="${escapeHTML(downloadUrl)}" download="${escapeHTML(session.lottery)}_${escapeHTML(session.time_slot)}_${escapeHTML(session.date)}.html">📥 Descargar archivo</a>` : ''}
+    ${showDownload ? `<a class="download" href="${escapeHTML(downloadUrl)}" download="${escapeHTML(session.lottery)}_${escapeHTML(session.time_slot)}_${escapeHTML(session.date)}.html" target="_parent">📥 Descargar archivo</a>` : ''}
 </body>
 </html>`;
 }
