@@ -2069,7 +2069,10 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
     }
     if (totalUSD > 0) updates.usd = Math.max(0, usdBalance - totalUSD);
 
-    // Guardar la jugada
+    // placed_at y updated_at se escriben con el MISMO instante para que una jugada recién
+    // registrada nunca parezca "editada" (si updated_at lo fija el DEFAULT/trigger de la BD,
+    // un desfase de reloj entre el servidor y la base genera falsos positivos).
+    const placedAt = new Date();
     const { data: betInserted, error: betError } = await supabase
         .from('bets')
         .insert({
@@ -2082,7 +2085,8 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
             raw_text: rawText,
             lottery: session?.lottery || null,
             bonus_used_cup: bonusUsed,
-            placed_at: new Date()
+            placed_at: placedAt,
+            updated_at: placedAt
         })
         .select()
         .single();
