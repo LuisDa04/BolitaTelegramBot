@@ -396,7 +396,6 @@ async function notifyDailyBetsReport() {
     const readableDate = moment.tz(TIMEZONE).subtract(1, 'day').format('DD/MM/YYYY');
 
     const recipients = [...new Set([...ADMIN_IDS, ...botRolesCache.sessionExporters])];
-    const url = await buildDailyReportUrl(reportDate);
 
     const hasBets = await dayHasBets(reportDate);
 
@@ -405,11 +404,13 @@ async function notifyDailyBetsReport() {
         `📅 ${readableDate}\n\n` +
         (hasBets
             ? `Pulsa el botón para ver el resumen del día.`
-            : `📭 No hubo apuestas en este día`);
+            : `📭 No hubo apuestas en este día.`);
 
-    const replyMarkup = Markup.inlineKeyboard([
-        [Markup.button.url('👁️ Ver resumen del día', url)]
-    ]).reply_markup;
+    const replyMarkup = hasBets
+        ? Markup.inlineKeyboard([
+            [Markup.button.url('👁️ Ver resumen del día', await buildDailyReportUrl(reportDate))]
+        ]).reply_markup
+        : undefined;
 
     for (const adminId of recipients) {
         try {
