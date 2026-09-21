@@ -4838,12 +4838,12 @@ async function autoPublishWinningResults() {
 
         const channel = configMap.auto_publish_channel || 'resultados_de_la_bolita';
 
-        let windowCfg = { min: 10, max: 30 };
+        let windowCfg = { min: 10, max: 50 };
         try {
             if (configMap.auto_publish_window) windowCfg = { ...windowCfg, ...JSON.parse(configMap.auto_publish_window) };
         } catch (e) { console.warn('[AutoPublish] auto_publish_window inválido, usando defaults:', e.message); }
         windowCfg.min = parseInt(windowCfg.min) || 10;
-        windowCfg.max = parseInt(windowCfg.max) || 30;
+        windowCfg.max = parseInt(windowCfg.max) || 50;
 
         const today = moment.tz(TIMEZONE).format('YYYY-MM-DD');
 
