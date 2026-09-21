@@ -5364,7 +5364,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         const bannedBadge = isBanned ? '<span class="text-red-400 text-xs ml-2">🚫 BANEADO</span>' : '';
                         const bannedAtStr = u.banned_at ? formatDate(u.banned_at) : '';
                         const blockedAtStr = u.blocked_at ? formatDate(u.blocked_at) : '';
-                        const blockedLine = u.blocked_at ? `<p class="text-xs text-red-300 mt-1">🔒 Bloqueó el bot: ${blockedAtStr}</p>` : '';
+                        const blockedLine = u.blocked_at ? `<p class="text-xs text-red-300 mt-1">🔒 Bloqueó al bot: ${blockedAtStr}</p>` : '';
                         cardsHtml += `<div class="bg-gray-800/60 p-4 rounded-xl cursor-pointer hover:bg-gray-700/60 transition user-card ${bannedClass}" data-userid="${u.telegram_id}" onclick="openBalanceModalWithFetch(${u.telegram_id}, '${escapeHTML(u.first_name || 'Sin nombre')}')">
                             <div class="flex justify-between items-start">
                                 <div>
