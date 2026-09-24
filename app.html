@@ -5621,6 +5621,49 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             }
         }
 
+        let unmutePollTimer = null;
+        let unmutePollTarget = null;
+
+        function stopUnmutePoll() {
+            if (unmutePollTimer) { clearInterval(unmutePollTimer); unmutePollTimer = null; }
+            unmutePollTarget = null;
+        }
+
+        // Sincroniza en tiempo real el botón "🔊 Desilenciar usuario" mientras el
+        // modal está abierto: si otro admin silencia/desilencia desde el bot, el
+        // botón aparece/desaparece solo (sin recargar el panel).
+        function startUnmutePoll(telegramId) {
+            stopUnmutePoll();
+            unmutePollTarget = telegramId;
+            const tick = async () => {
+                const modalEl = document.getElementById('adminModal');
+                if (!modalEl || modalEl.classList.contains('hidden') || unmutePollTarget == null) {
+                    stopUnmutePoll();
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/admin/user/${unmutePollTarget}?userId=${currentUser.telegram_id}`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const muted = !!data.user?.support_muted;
+                    const existing = document.getElementById('unmuteUserBtn');
+                    if (muted && !existing) {
+                        const btn = document.createElement('button');
+                        btn.id = 'unmuteUserBtn';
+                        btn.className = 'w-full bg-cyan-700 py-3 rounded-xl mt-2 font-bold';
+                        btn.textContent = '🔊 Desilenciar usuario';
+                        btn.onclick = () => desilenciarSoporte(telegramId);
+                        const saveBtn = document.getElementById('saveBalanceBtn');
+                        if (saveBtn) saveBtn.insertAdjacentElement('afterend', btn);
+                    } else if (!muted && existing) {
+                        existing.remove();
+                    }
+                } catch (e) {}
+            };
+            tick();
+            unmutePollTimer = setInterval(tick, 4000);
+        }
+
         window.openBalanceModalWithFetch = async (telegramId, displayName) => {
             modalBody.innerHTML = `
                 <div class="flex items-center justify-center py-8">
@@ -5643,6 +5686,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 const usdVal = parseFloat(u.usd) || 0;
                 const bonusVal = parseFloat(u.bonus_cup) || 0;
                 const banned = !!u.is_banned;
+                const supportMuted = !!u.support_muted;
                 let bannedAt = '';
                 if (u.banned_at) {
                     const d = new Date(u.banned_at);
@@ -5650,20 +5694,23 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 }
                 const bonusUpdatedByAdmin = !!u.bonus_updated_by_admin;
                 const hasHadPrincipalBalance = !!u.hasHadPrincipalBalance;
-                openBalanceModal(telegramId, displayName, cupVal, usdVal, bonusVal, banned, bannedAt, u.username, !!u.is_superadmin, !!u.is_staff, bonusUpdatedByAdmin, hasHadPrincipalBalance);
+                openBalanceModal(telegramId, displayName, cupVal, usdVal, bonusVal, banned, bannedAt, u.username, !!u.is_superadmin, !!u.is_staff, bonusUpdatedByAdmin, hasHadPrincipalBalance, supportMuted);
             } catch (e) {
                 iziToast.error({ message: 'Error de conexión al cargar datos del usuario' });
                 adminModal.classList.add('hidden');
             }
         };
 
-        window.openBalanceModal = (telegramId, name, cup, usd, bonus, isBanned = false, bannedAt = '', username = '', isTargetSuperadmin = false, isTargetStaff = false, bonusUpdatedByAdmin = false, hasHadPrincipalBalance = false) => {
+        window.openBalanceModal = (telegramId, name, cup, usd, bonus, isBanned = false, bannedAt = '', username = '', isTargetSuperadmin = false, isTargetStaff = false, bonusUpdatedByAdmin = false, hasHadPrincipalBalance = false, supportMuted = false) => {
             const canManage = true;
             const showBanButton = canManage;
             const showDeleteButton = canManage && (isAdmin || userRoles.includes('user_deleter'));
             const banButtonHtml = isBanned
                 ? (showBanButton ? `<button id="banUserBtn" onclick="desbanearUsuario(${telegramId})" class="w-full bg-green-700 py-3 rounded-xl mt-2 font-bold">✅ Desbanear usuario</button>` : '')
                 : (showBanButton ? `<button id="banUserBtn" onclick="banearUsuario(${telegramId})" class="w-full bg-red-700 py-3 rounded-xl mt-2 font-bold">🚫 Banear usuario</button>` : '');
+            const unmuteButtonHtml = supportMuted
+                ? `<button id="unmuteUserBtn" onclick="desilenciarSoporte(${telegramId})" class="w-full bg-cyan-700 py-3 rounded-xl mt-2 font-bold">🔊 Desilenciar usuario</button>`
+                : '';
             modalBody.innerHTML = `
                 <h4 class="text-xl font-bold mb-4">Editar saldo de ${escapeHTML(name)} (ID: ${telegramId})</h4>
                 ${isBanned ? `<p class="text-red-400 font-bold mb-3">🚫 Este usuario está BANEADO</p>${bannedAt ? `<p class="text-white text-sm mb-3">🚫 Baneado: ${bannedAt}</p>` : ''}` : ''}
@@ -5703,12 +5750,14 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     ` : ''}
                 </div>
                 <button id="saveBalanceBtn" onclick="saveBalanceEdit(${telegramId})" class="w-full bg-green-600 py-3 rounded-xl mt-4 font-bold">💾 Guardar cambios</button>
+                ${unmuteButtonHtml}
                 ${!username ? `<button onclick="sendDirectMessage(${telegramId}, '${escapeHTML(name)}')" class="w-full bg-blue-600 py-3 rounded-xl mt-2 font-bold">📨 Enviar mensaje por ID</button>` : ''}
                 ${showDeleteButton ? `<button id="resetUserBtn" onclick="reiniciarUsuario(${telegramId})" class="w-full bg-yellow-700 py-3 rounded-xl mt-2 font-bold">🗑 Eliminar usuario</button>` : ''}
                 ${banButtonHtml}
                 <button onclick="document.getElementById('adminModal').classList.add('hidden')" class="w-full bg-gray-600 py-2 rounded-lg mt-2">Cancelar</button>
             `;
             adminModal.classList.remove('hidden');
+            startUnmutePoll(telegramId);
         };
 
         window.adjustBalance = (telegramId, field, amount) => {
@@ -6254,6 +6303,35 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                 iziToast.error({ message: 'Error de conexión' });
                 btn.disabled = false;
                 btn.innerHTML = '✅ Desbanear usuario';
+            }
+        };
+
+        window.desilenciarSoporte = async (telegramId) => {
+            const btn = document.getElementById('unmuteUserBtn');
+            if (!btn || btn.disabled) return;
+            if (!confirm(`¿Deseas DESILENCIAR el soporte del usuario ${telegramId}?`)) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Desilenciando...';
+            try {
+                const res = await fetch(`/api/admin/users/${telegramId}/support-mute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.telegram_id })
+                });
+                if (res.ok) {
+                    iziToast.success({ message: 'Soporte desilenciado correctamente.' });
+                    btn.remove();
+                } else {
+                    let errMsg = 'Error al desilenciar';
+                    try { const err = await res.json(); errMsg = err.error || errMsg; } catch (_) {}
+                    iziToast.error({ message: errMsg });
+                    btn.disabled = false;
+                    btn.innerHTML = '🔊 Desilenciar usuario';
+                }
+            } catch (e) {
+                iziToast.error({ message: 'Error de conexión' });
+                btn.disabled = false;
+                btn.innerHTML = '🔊 Desilenciar usuario';
             }
         };
 

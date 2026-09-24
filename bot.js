@@ -7954,6 +7954,10 @@ async function updatePendingNotifications(key, statusText) {
 // Exponer funciones para que backend.js pueda refrescar el caché al asignar roles
 bot.refreshBotRolesCache = refreshBotRolesCache;
 
+// Exponer la cascada de mute de soporte para que backend.js pueda sincronizar en
+// tiempo real las notificaciones de soporte cuando cambia el estado desde la web.
+bot.cascadeSupportMuteUi = cascadeSupportMuteUi;
+
 // Capturar errores no manejados en handlers del bot para evitar que crasheen el proceso
 bot.catch((err) => {
     console.error('[bot.catch] Error no manejado en handler del bot:', err?.message || err);
