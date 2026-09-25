@@ -5341,6 +5341,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         <button class="filter-btn bg-blue-600 px-3 py-1 rounded-full text-sm" data-filter="referred">Refiriendo</button>
                         <button class="filter-btn bg-cyan-600 px-3 py-1 rounded-full text-sm" data-filter="withBets">Con jugadas</button>
                         <button class="filter-btn bg-orange-600 px-3 py-1 rounded-full text-sm" data-filter="onlyId">Solo con ID</button>
+                        <button class="filter-btn bg-indigo-600 px-3 py-1 rounded-full text-sm" data-filter="muted">Silenciados</button>
                         <button class="filter-btn bg-red-700 px-3 py-1 rounded-full text-sm" data-filter="banned">Baneados</button>
                         <button class="filter-btn bg-gray-700 px-3 py-1 rounded-full text-sm" data-filter="deleted">Eliminados</button>
                         <button class="filter-btn bg-red-900 px-3 py-1 rounded-full text-sm" data-filter="blocked">Que bloquearon al bot</button>
@@ -5385,19 +5386,23 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         const cup = parseFloat(u.cup) || 0;
                         const usd = parseFloat(u.usd) || 0;
                         const bonus = parseFloat(u.bonus_cup) || 0;
+                        const isMuted = !!u.is_muted;
                         const isBanned = !!u.is_banned;
                         const bannedClass = isBanned ? 'opacity-60 border border-red-500' : '';
                         const bannedBadge = isBanned ? '<span class="text-red-400 text-xs ml-2">🚫 BANEADO</span>' : '';
+                        const mutedBadge = isMuted ? '<span class="text-indigo-300 text-xs ml-2">🔇 SILENCIADO</span>' : '';
                         const bannedAtStr = u.banned_at ? formatDate(u.banned_at) : '';
                         const blockedAtStr = u.blocked_at ? formatDate(u.blocked_at) : '';
                         const blockedLine = u.blocked_at ? `<p class="text-xs text-red-300 mt-1">🔒 Bloqueó al bot: ${blockedAtStr}</p>` : '';
+                        const mutedLine = isMuted ? '<p class="text-xs text-indigo-300 mt-1">🔇 Sin acceso al soporte</p>' : '';
                         cardsHtml += `<div class="bg-gray-800/60 p-4 rounded-xl cursor-pointer hover:bg-gray-700/60 transition user-card ${bannedClass}" data-userid="${u.telegram_id}" onclick="openBalanceModalWithFetch(${u.telegram_id}, '${escapeHTML(u.first_name || 'Sin nombre')}')">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="font-bold">${escapeHTML(u.first_name || 'Usuario')} ${u.username ? '<span class="text-gray-400 text-sm">@'+escapeHTML(u.username)+'</span>' : ''}${bannedBadge}</p>
+                                    <p class="font-bold">${escapeHTML(u.first_name || 'Usuario')} ${u.username ? '<span class="text-gray-400 text-sm">@'+escapeHTML(u.username)+'</span>' : ''}${bannedBadge}${mutedBadge}</p>
                                     <p class="text-xs text-gray-400">ID: ${u.telegram_id}</p>
                                     ${isBanned && bannedAtStr ? `<p class="text-xs text-white mt-1">🚫 Baneado: ${bannedAtStr}</p>` : ''}
                                     ${blockedLine}
+                                    ${mutedLine}
                                 </div>
                                 <div class="text-right text-sm">
                                     <p>CUP: <span class="text-cyan-300">${cup.toFixed(2)}</span></p>
@@ -5435,6 +5440,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             case 'referred': count = allUsers.filter(u => u.is_referred === true).length; break;
                             case 'withBets': count = allUsers.filter(u => u.has_bets === true).length; break;
                             case 'onlyId': count = allUsers.filter(u => !u.username || String(u.username).trim() === '').length; break;
+                            case 'muted': count = allUsers.filter(u => u.is_muted === true).length; break;
                             case 'banned': count = allUsers.filter(u => u.is_banned === true).length; break;
                             case 'blocked': count = allUsers.filter(u => u.has_blocked_bot === true).length; break;
                         }
@@ -5456,6 +5462,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     referred: 'refiriendo',
                     withBets: 'con jugadas',
                     onlyId: 'solo con ID',
+                    muted: 'silenciados',
                     banned: 'baneados',
                     blocked: 'que bloquearon al bot',
                     deleted: 'eliminados'
@@ -5552,6 +5559,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                                 break;
                             case 'onlyId':
                                 categoryMatch = (!user.username || String(user.username).trim() === '');
+                                break;
+                            case 'muted':
+                                categoryMatch = (user.is_muted === true);
                                 break;
                             case 'banned':
                                 categoryMatch = (user.is_banned === true);

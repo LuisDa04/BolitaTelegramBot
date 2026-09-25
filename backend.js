@@ -4881,7 +4881,7 @@ app.get('/api/admin/users', async (req, res) => {
         // 1. Obtener todos los usuarios (incluyendo ref_by)
         const { data: users, error } = await supabase
             .from('users')
-            .select('telegram_id, first_name, username, cup, usd, bonus_cup, ref_by, is_banned, banned_at, blocked_at')
+            .select('telegram_id, first_name, username, cup, usd, bonus_cup, ref_by, is_banned, banned_at, blocked_at, support_muted')
             .order('first_name', { ascending: true });
 
         if (error) {
@@ -4932,6 +4932,7 @@ app.get('/api/admin/users', async (req, res) => {
             banned_at: u.banned_at,
             blocked_at: u.blocked_at,
             has_blocked_bot: !!u.blocked_at,
+            is_muted: !!u.support_muted,
             is_superadmin: isAdmin(u.telegram_id),
             is_staff: adminRoleUserIds.has(u.telegram_id)
         }));
