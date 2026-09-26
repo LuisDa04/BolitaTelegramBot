@@ -5026,7 +5026,7 @@ function buildSupportKeyboard(targetUid, { muted, showReply, userMsgId } = {}) {
     const rows = [];
     if (showReply) {
         const replyCb = userMsgId != null ? `support_reply_${targetUid}_${userMsgId}` : `support_reply_${targetUid}`;
-        rows.push([Markup.button.callback('📩 Responder', replyCb), muteBtn]);
+        rows.push([muteBtn, Markup.button.callback('📩 Responder', replyCb)]);
     } else {
         rows.push([muteBtn]);
     }
