@@ -4738,6 +4738,7 @@ app.get('/api/admin/user/:targetUserId', async (req, res) => {
                 is_banned: user.is_banned,
                 banned_at: user.banned_at,
                 support_muted: !!user.support_muted,
+                support_muted_at: user.support_muted_at || null,
                 is_superadmin: isAdmin(targetUserId),
                 is_staff: await hasAdminRoles(targetUserId),
                 bonus_updated_by_admin: !!user.bonus_updated_by_admin,
