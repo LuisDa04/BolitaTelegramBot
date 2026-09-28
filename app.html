@@ -42,6 +42,18 @@
             transform: scale(1.02);
             box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
         }
+        /* Botón principal sin cambios pendientes: gris y sin reacción al hover */
+        .btn-idle {
+            background-image: none !important;
+            background-color: #4b5563;
+            color: #9ca3af;
+            box-shadow: none !important;
+            cursor: not-allowed;
+        }
+        .btn-idle:hover {
+            transform: none;
+            box-shadow: none !important;
+        }
         .neon-text {
             text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff;
         }
@@ -941,7 +953,12 @@
             }
 
             window.editingBetId = null;
-            if (submitBetBtn) submitBetBtn.innerHTML = defaultSubmitBetBtnHtml;
+            window._betEditBaseline = null;
+            if (submitBetBtn) {
+                submitBetBtn.innerHTML = defaultSubmitBetBtnHtml;
+                submitBetBtn.classList.remove('btn-idle');
+                applySaveButtonState();
+            }
             if (clearForm) {
                 if (betInput) betInput.value = '';
                 if (betPreview) betPreview.innerHTML = '';
@@ -951,6 +968,18 @@
                 if (betFormContainer) betFormContainer.classList.add('hidden');
             }
             return false;
+        }
+
+        // Estado del botón principal según haya cambios pendientes de guardar.
+        // Solo aplica en modo edición: en apuesta nueva el botón siempre está activo.
+        // Mientras no haya cambios el botón queda deshabilitado y en gris, así que
+        // pulsarlo no hace nada (no se avisa al usuario de que no cambió nada).
+        // El bloqueo por envío en curso tiene prioridad para evitar dobles guardados.
+        function applySaveButtonState() {
+            if (!submitBetBtn) return;
+            const idle = !!window.editingBetId && betInput.value === window._betEditBaseline;
+            submitBetBtn.disabled = !!window._betSubmitting || idle;
+            submitBetBtn.classList.toggle('btn-idle', idle);
         }
 
         // Mostrar el modal y almacenar la acción pendiente cuando el usuario intenta
@@ -1476,6 +1505,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
         }
 
         betInput.addEventListener('input', function() {
+            applySaveButtonState();
             if (!selectedBetType) return;
             const rawText = this.value;
             const parsed = parseBetMessage(rawText, selectedBetType);
@@ -1622,7 +1652,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
 
         async function sendBetRequest(payload) {
             // Bloquear botón para evitar doble envío
+            window._betSubmitting = true;
             submitBetBtn.disabled = true;
+            submitBetBtn.classList.remove('btn-idle');
             const isEditing = !!window.editingBetId;
             submitBetBtn.innerHTML = isEditing ? '<i class="fas fa-save mr-2"></i>Guardando...' : '<i class="fas fa-check-circle mr-2"></i>Registrando...';
 
@@ -1665,13 +1697,16 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 iziToast.error({ message: 'Error de conexión' });
             } finally {
                 // Restaurar botón siempre, incluso si hubo error
-                submitBetBtn.disabled = false;
+                window._betSubmitting = false;
                 if (!window.editingBetId) {
                     submitBetBtn.innerHTML = defaultSubmitBetBtnHtml; // "Registrar apuesta"
                 } else {
                     // Si seguía en modo edición (porque falló), volver a "Guardar cambios"
                     submitBetBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar cambios';
                 }
+                // Re-evalua el estado inactivo: si el texto volvió al de la jugada
+                // cargada (p.ej. tras un noChanges), el botón queda gris de nuevo.
+                applySaveButtonState();
             }
         }
 
@@ -2292,7 +2327,11 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             betInput.dispatchEvent(new Event('input'));
                             // marcar que estamos editando para que el submit incluya betId
                             window.editingBetId = bet.id;
+                            // Línea base: el texto tal como quedó cargado, para detectar
+                            // si el usuario lo modifica antes de habilitar el guardado.
+                            window._betEditBaseline = betInput.value;
                             submitBetBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar cambios';
+                            applySaveButtonState();
                             iziToast.info({ message: 'Jugada cargada para editar. Modifica y guarda los cambios.👇🏻' });
                         }, 500);
                     }
