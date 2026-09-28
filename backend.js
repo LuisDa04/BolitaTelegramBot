@@ -1279,6 +1279,45 @@ async function validateBetLimits(items, betType, priceData, { userId, sessionId,
     return { ok: true };
 }
 
+// --- Comparación de dos jugadas por número y moneda ---
+// Espejo de betNumOf/betCupOf/betUsdOf/betTotalsByNum/betTotalsEqual del cliente
+// (app.html). Sirve para detectar que una edición guardada es SEMÁNTICAMENTE igual
+// a la que ya estaba en la base de datos: se comparan los totales por número, no
+// el texto ni el orden de los items, para que un simple reformateo ("5x50x2" vs
+// "5x100") no se reporte como un cambio.
+function betNumOf(item, betType) {
+    return betType === 'parle' ? (normalizeParleValue(item.numero) || item.numero) : item.numero;
+}
+function betCupOf(item) {
+    return item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount) : 0);
+}
+function betUsdOf(item) {
+    return item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount) : 0);
+}
+function betTotalsByNum(items, betType) {
+    const totals = {};
+    if (!Array.isArray(items)) return totals;
+    for (const it of items) {
+        if (!it) continue;
+        const num = betNumOf(it, betType);
+        if (!totals[num]) totals[num] = { cup: 0, usd: 0 };
+        totals[num].cup += betCupOf(it) || 0;
+        totals[num].usd += betUsdOf(it) || 0;
+    }
+    return totals;
+}
+function betTotalsEqual(a, b) {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) {
+        const ca = Math.round((a[k]?.cup || 0) * 100);
+        const ua = Math.round((a[k]?.usd || 0) * 100);
+        const cb = Math.round((b[k]?.cup || 0) * 100);
+        const ub = Math.round((b[k]?.usd || 0) * 100);
+        if (ca !== cb || ua !== ub) return false;
+    }
+    return true;
+}
+
 // Recorta los montos de los números excedidos hasta el máximo permitido, teniendo
 // en cuenta apuestas previas (existingTotals). El monto admisible por número
 // (máximo − base) se reparte de forma EQUITATIVA entre las repeticiones de la
@@ -2592,9 +2631,36 @@ app.post('/api/bets', async (req, res) => {
         if (!existingBet) return res.status(404).json({ error: 'Jugada no encontrada' });
         if (parseInt(existingBet.user_id) !== parseInt(userId)) return res.status(403).json({ error: 'No autorizado para editar esta jugada' });
 
+        // El tipo de la petición debe coincidir con el de la jugada guardada: el
+        // UPDATE de más abajo no cambia bet_type, así que un tipo distinto
+        // dejaría items parseados en un tipo que nunca se persiste.
+        if (betType !== existingBet.bet_type) {
+            return res.status(400).json({ error: 'No se puede editar: el tipo de apuesta no coincide con la jugada original' });
+        }
+
         if (existingBet.session_id) {
             const { data: session } = await supabase.from('lottery_sessions').select('status').eq('id', existingBet.session_id).maybeSingle();
             if (!session || session.status !== 'open') return res.status(400).json({ error: 'No se puede editar: sesión cerrada' });
+            // Los límites acumulados se calculan contra la sesión del body: si no
+            // es la sesión de la jugada, se excluirían/aplicarían topes de otra sesión.
+            if (String(existingBet.session_id) !== String(sessionId)) {
+                return res.status(400).json({ error: 'No se puede editar: la jugada pertenece a otra sesión' });
+            }
+        }
+
+        // --- La edición no cambió nada: cortar ANTES de tocar saldo/comisión ---
+        // Al editar, la jugada se excluye de `existingTotals`, así que el monto
+        // admisible es el hueco libre de las OTRAS jugadas. Si ese hueco coincide con
+        // lo que esta jugada ya tenía, `clampItemsToMax` devuelve exactamente los
+        // mismos items. Antes esto se guardaba como si fuera una edición real
+        // (reembolso, recálculo de comisión, aviso al referido y UPDATE sin efecto).
+        if (betTotalsEqual(betTotalsByNum(parsed.items, betType), betTotalsByNum(existingBet.items, betType))) {
+            return res.json({
+                success: true,
+                noChanges: true,
+                bet: existingBet,
+                updatedUser: user
+            });
         }
 
         // --- Datos de la apuesta original y balances actuales del apostador ---
@@ -2822,10 +2888,20 @@ app.post('/api/bets', async (req, res) => {
             if (newCommissionData.referrer_cup > 0) {
                 commissionUpdatePayload.bonus_updated_by_admin = null;
             }
-            await supabase
+            const { error: editCommissionError } = await supabase
                 .from('users')
                 .update(commissionUpdatePayload)
                 .eq('telegram_id', newCommissionData.referrer_id);
+            if (editCommissionError) {
+                // Solo se registra: abortar aquí dejaría la comisión vieja revertida
+                // sin la nueva, y un reintento la revertiría dos veces.
+                console.error('Error acreditando comisión nueva en edición:', {
+                    betId,
+                    referrerId: newCommissionData.referrer_id,
+                    commission: newCommissionData.commission_amount,
+                    error: editCommissionError
+                });
+            }
         }
 
         // Revertir bono restante si el referidor quedó por debajo del umbral
@@ -3012,10 +3088,18 @@ app.post('/api/bets', async (req, res) => {
                     if (newBonus !== (parseFloat(referrer.bonus_cup) || 0)) updatePayload.bonus_cup = newBonus;
                     if (newCup > (parseFloat(referrer.cup) || 0)) updatePayload.bonus_updated_by_admin = null;
 
-                    await supabase
+                    const { error: newCommissionError } = await supabase
                         .from('users')
                         .update(updatePayload)
                         .eq('telegram_id', referrerId);
+                    if (newCommissionError) {
+                        console.error('Error acreditando comisión en apuesta nueva:', {
+                            betId: bet.id,
+                            referrerId,
+                            commission: commissionCUP,
+                            error: newCommissionError
+                        });
+                    }
 
                     let notifyMessage = `🔄 Has recibido una referencia\n\n` +
                         `👤 De: ${escapeHTML(referrerName)}\n` +
@@ -3046,7 +3130,7 @@ app.post('/api/bets', async (req, res) => {
                         console.warn('Error notificando al referidor:', e.message);
                     }
 
-                    await supabase
+                    const { error: betCommissionError } = await supabase
                         .from('bets')
                         .update({
                             referrer_id: referrerId,
@@ -3056,6 +3140,14 @@ app.post('/api/bets', async (req, res) => {
                             referrer_bonus_before: bonusMovedCup
                         })
                         .eq('id', bet.id);
+                    if (betCommissionError) {
+                        console.error('Error registrando comisión en la apuesta nueva:', {
+                            betId: bet.id,
+                            referrerId,
+                            commission: commissionCUP,
+                            error: betCommissionError
+                        });
+                    }
                 }
             }
         }

@@ -1634,6 +1634,15 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 });
                 const data = await res.json();
                 if (res.ok) {
+                    // El backend detectó que el recorte al máximo dejó la jugada igual
+                    // que como ya estaba (p.ej. los números ya estaban en su tope). No
+                    // se guardó nada, así que se avisa y se sigue en modo edición para
+                    // que el usuario pueda intentar otra cantidad.
+                    if (data.noChanges) {
+                        iziToast.info({ message: 'ℹ No hubo cambios en tu apuesta.' });
+                        loadBets();
+                        return;
+                    }
                     const wasOmitted = payload.omitLimitOverride === true;
                     const overLimitPhrase = overLimitTypePhrase([selectedBetType]).replace(/^./, c => c.toLowerCase());
                     iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: (wasOmitted ? `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.` : '¡Buena suerte!') + ' 🍀' });
