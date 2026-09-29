@@ -5399,6 +5399,8 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
         // usa el backend: "número" SOLO para fijo y corridos, "centena" (femenino)
         // y "parlet". `singular` fuerza el singular aunque se combinen varios tipos,
         // que es lo que hace falta en "se omitió <algo> 38 por estar ya en su máximo".
+        // Las apuestas son de un solo tipo, así que los llamantes siempre pasan un
+        // array con un elemento; las combinaciones de 2 y 3 tipos son defensivas.
         function overLimitTypePhrase(betTypes, { singular = false } = {}) {
             const unique = [...new Set((betTypes || []).map(t => String(t || '').toLowerCase()))];
             const withArticles = [];
@@ -5415,9 +5417,8 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 return withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
             }
             if (withArticles.length === 2) {
-                // El segundo tipo va con mayúscula porque abre su propia enumeración.
                 const first = withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
-                return `${first} y ${withArticles[1].charAt(0).toUpperCase()}${withArticles[1].slice(1)}`;
+                return `${first} y ${withArticles[1]}`;
             }
             return 'Los números, centenas y parlets';
         }
