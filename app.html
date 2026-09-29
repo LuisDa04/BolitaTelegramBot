@@ -1747,9 +1747,11 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         pendingBetPayload = payload;
                         showMaxedEditModal(data.error);
                     } else if (data.code === 'EDIT_NOTHING_TO_APPLY') {
-                        // La apuesta queda tal como estaba: solo avisar y seguir editando
-                        // para que el usuario corrija el texto a mano.
-                        iziToast.warning({ message: data.error });
+                        // Lo único que se intentó fue apostar más a números que ya
+                        // estaban al máximo: la apuesta queda tal como estaba, así
+                        // que se avisa en rojo y se sigue editando para que el
+                        // usuario corrija el texto a mano.
+                        iziToast.error({ message: data.error });
                         loadBets();
                     } else if (data.code === 'LIMIT_EXCEED_CONFIRMABLE' && data.exceedData) {
                         pendingBetPayload = payload;
