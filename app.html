@@ -1730,7 +1730,11 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         successMsg = `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.`;
                     } else if (droppedMaxed.length > 0) {
                         const pluralDropped = droppedMaxed.length > 1;
-                        successMsg = `Se guardaron los cambios y se omitió${pluralDropped ? 'ron' : ''} ${pluralDropped ? overLimitPhrase : (selectedBetType === 'centena' ? 'la centena' : (selectedBetType === 'parle' ? 'el parlete' : 'el número'))} ${joinListWithY(droppedMaxed)} por estar ya en su máximo.`;
+                        // Un solo número: artículo y sustantivo en singular, con el
+                        // mismo término que usa el backend ("número" solo para fijo y
+                        // corridos, "centena" y "parlet").
+                        const singularPhrase = overLimitTypePhrase([selectedBetType], { singular: true });
+                        successMsg = `Se guardaron los cambios y se omitió${pluralDropped ? 'ron' : ''} ${pluralDropped ? overLimitPhrase : singularPhrase} ${joinListWithY(droppedMaxed)} por estar ya en su máximo.`;
                     }
                     iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + ' 🍀' });
                     currentUser = data.updatedUser;
@@ -5391,19 +5395,29 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             return labels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
         }
 
-        function overLimitTypePhrase(betTypes) {
+        // Sustantivo de un tipo de apuesta, con artículo. El término es el mismo que
+        // usa el backend: "número" SOLO para fijo y corridos, "centena" (femenino)
+        // y "parlet". `singular` fuerza el singular aunque se combinen varios tipos,
+        // que es lo que hace falta en "se omitió <algo> 38 por estar ya en su máximo".
+        function overLimitTypePhrase(betTypes, { singular = false } = {}) {
             const unique = [...new Set((betTypes || []).map(t => String(t || '').toLowerCase()))];
             const withArticles = [];
             if (unique.includes('fijo') || unique.includes('corridos')) withArticles.push('números');
             if (unique.includes('centena')) withArticles.push('centenas');
             if (unique.includes('parle')) withArticles.push('parlets');
-            if (withArticles.length === 0) return 'números';
+            if (withArticles.length === 0) return singular ? 'el número' : 'números';
+            if (singular) {
+                const one = withArticles[0];
+                const noun = one.replace(/s$/, '');
+                return (one === 'centenas' ? 'la ' : 'el ') + noun;
+            }
             if (withArticles.length === 1) {
                 return withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
             }
             if (withArticles.length === 2) {
+                // El segundo tipo va con mayúscula porque abre su propia enumeración.
                 const first = withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
-                return `${first} y ${withArticles[1]}`;
+                return `${first} y ${withArticles[1].charAt(0).toUpperCase()}${withArticles[1].slice(1)}`;
             }
             return 'Los números, centenas y parlets';
         }

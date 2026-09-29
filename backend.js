@@ -1537,8 +1537,11 @@ function maxedExceeders(exceedData, currentTotals = {}) {
 // en el aviso preguntable (⚠️) como en el error que no pregunta (❌).
 function maxedSentences(betType, maxed, exceedData) {
     const sentences = [];
-    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (betType === 'centena' ? 'centena' : 'parlete');
-    const nounPlural = typeNoun === 'número' ? 'números' : (typeNoun === 'centena' ? 'centenas' : 'parletes');
+    // El sustantivo sale de `formatBetTypeLabel` para que este aviso use siempre
+    // el mismo término que los de límites y de monto admisible: "número" SOLO
+    // para fijo y corridos, "centena" para centena y "parlet" para parlete.
+    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : formatBetTypeLabel(betType).toLowerCase();
+    const nounPlural = typeNoun === 'número' ? 'números' : typeNoun === 'centena' ? 'centenas' : `${typeNoun}s`;
 
     const sortNums = (nums) => [...nums].sort((a, b) => {
         const na = parseInt(a, 10);
