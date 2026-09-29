@@ -1490,6 +1490,78 @@ function admissibleLinesForNumbers(items, betType, exceedData) {
     return lines;
 }
 
+// Números excedidos que NO admiten más monto porque OTRAS jugadas del mismo
+// usuario/sesión/tipo ya consumieron el tope completo (máximo − base = 0). Para
+// esos el recorte no deja hueco: la única salida en una edición es descartarlos
+// y aplicar el resto de los cambios de la jugada.
+// A diferencia de `alreadyMaxed` (que juzga el número entero), aquí el desglose es
+// POR MONEDA: un número puede estar al tope en CUP y aún tener hueco en USD, y en
+// ese caso solo se descarta su porción en CUP.
+// Devuelve { cup: [...], usd: [...] } con los números sin cupo libre por moneda.
+function maxedExceeders(exceedData) {
+    const empty = { cup: [], usd: [] };
+    if (!exceedData) return empty;
+    const maxCup = exceedData.maxCup;
+    const maxUsd = exceedData.maxUsd;
+    const existingTotals = exceedData.existingTotals || {};
+    const cupExceeders = exceedData.cupExceeders || [];
+    const usdExceeders = exceedData.usdExceeders || [];
+
+    const cup = [];
+    const usd = [];
+    const allNums = [...new Set([...cupExceeders, ...usdExceeders])];
+    for (const num of allNums) {
+        const base = existingTotals[num] || { cup: 0, usd: 0 };
+        if (maxCup !== null && maxCup !== undefined && cupExceeders.some(n => String(n) === String(num)) && (base.cup || 0) >= parseFloat(maxCup)) {
+            cup.push(num);
+        }
+        if (maxUsd !== null && maxUsd !== undefined && usdExceeders.some(n => String(n) === String(num)) && (base.usd || 0) >= parseFloat(maxUsd)) {
+            usd.push(num);
+        }
+    }
+    return { cup, usd };
+}
+
+// Texto del aviso al editar cuando hay números ya apostados a su máximo.
+// Una frase por moneda (CUP primero, luego USD) y la pregunta una sola vez.
+function maxedNoticeText(betType, maxed, exceedData) {
+    const sentences = [];
+    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (betType === 'centena' ? 'centena' : 'parlete');
+    const nounPlural = typeNoun === 'número' ? 'números' : (typeNoun === 'centena' ? 'centenas' : 'parletes');
+
+    const sortNums = (nums) => [...nums].sort((a, b) => {
+        const na = parseInt(a, 10);
+        const nb = parseInt(b, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return String(a).localeCompare(String(b));
+    });
+
+    const sentenceFor = (nums, max, currency) => {
+        const list = sortNums(nums);
+        if (list.length === 0) return null;
+        const isPlural = list.length > 1;
+        const subject = isPlural
+            ? `${typeNoun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${joinListWithY(list)}`
+            : `${typeNoun === 'centena' ? 'La' : 'El'} ${typeNoun} ${list[0]}`;
+        const verb = isPlural ? 'fueron' : 'fue';
+        const participle = isPlural
+            ? `${typeNoun === 'centena' ? 'apostadas' : 'apostados'}`
+            : `${typeNoun === 'centena' ? 'apostada' : 'apostado'}`;
+        return `⚠️ ${subject} ya ${verb} ${participle} a su máximo permitido de ${parseFloat(max).toFixed(2)} ${currency}.`;
+    };
+
+    if (exceedData?.maxCup !== null && exceedData?.maxCup !== undefined) {
+        const s = sentenceFor(maxed.cup, exceedData.maxCup, 'CUP');
+        if (s) sentences.push(s);
+    }
+    if (exceedData?.maxUsd !== null && exceedData?.maxUsd !== undefined) {
+        const s = sentenceFor(maxed.usd, exceedData.maxUsd, 'USD');
+        if (s) sentences.push(s);
+    }
+    if (sentences.length === 0) return null;
+    return `${sentences.join(' ')}\n¿Deseas continuar con la edición?`;
+}
+
 // ========== FUNCIONES DE PARSEO DE APUESTAS ==========
 // Devuelve {items, ok}. ok=false si algún token de la línea no corresponde al
 // tipo de apuesta seleccionado (no se descarta en silencio).
@@ -2563,9 +2635,43 @@ app.post('/api/bets', async (req, res) => {
         sessionId: sessionId || null,
         excludeBetId: betId || null
     });
+    // Números ya apostados al máximo (por OTRAS jugadas) que la edición no puede
+    // aumentar. En una edición no se bloquea: se pregunta y, al continuar, se
+    // descartan esos números y se aplican el resto de los cambios de la jugada.
+    let maxedOnEdit = null;
     if (!limitCheck.ok) {
-        if (limitCheck.confirmable) {
-            // Único error: números repetidos que exceden el máximo. La web pregunta
+        const maxed = maxedExceeders(limitCheck.exceedData);
+        const isEditMaxed = !!betId && (maxed.cup.length > 0 || maxed.usd.length > 0);
+        if (isEditMaxed) {
+            maxedOnEdit = maxed;
+            if (req.body.confirmLimitOverride === true) {
+                // Confirmado: el recorte deja en 0 (y descarta) los números ya al
+                // máximo, y ajusta al máximo los que aún tienen cupo libre.
+                const numsBeforeClamp = new Set(parsed.items.map(it => String(betNumOf(it, betType))));
+                const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
+                if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
+                    // La apuesta NO se toca (aún no se reembolsó nada): solo avisar.
+                    return res.status(400).json({
+                        error: '❌ Todos los cambios de la edición eran de números ya apostados a su máximo. La apuesta se mantiene sin cambios.',
+                        code: 'EDIT_NOTHING_TO_APPLY'
+                    });
+                }
+                maxedOnEdit.dropped = [...numsBeforeClamp]
+                    .filter(n => !clamped.items.some(it => String(betNumOf(it, betType)) === n));
+                parsed.items = clamped.items;
+                totalCUP = clamped.totalCUP;
+                totalUSD = clamped.totalUSD;
+                effectiveRawText = serializeItemsToText(parsed.items, betType);
+            } else {
+                return res.status(400).json({
+                    error: maxedNoticeText(betType, maxed, limitCheck.exceedData),
+                    code: 'MAXED_NUMBERS_ON_EDIT',
+                    maxedCup: maxed.cup,
+                    maxedUsd: maxed.usd
+                });
+            }
+        } else if (limitCheck.confirmable) {
+            // Apuesta nueva: números repetidos que exceden el máximo. La web pregunta
             // si se apuesta hasta el máximo permitido (recorte), se omiten los
             // números excedidos o se cancela.
             if (req.body.confirmLimitOverride === true) {
@@ -2977,7 +3083,14 @@ app.post('/api/bets', async (req, res) => {
         }
 
         const updatedUser = await getOrCreateUser(parseInt(userId));
-        return res.json({ success: true, bet: updatedBet, updatedUser });
+        // Si el recorte descartó números ya apostados a su máximo, se devuelven
+        // para que la web lo diga explícitamente en el aviso de "Jugada editada".
+        return res.json({
+            success: true,
+            bet: updatedBet,
+            updatedUser,
+            droppedMaxedNums: (maxedOnEdit?.dropped || []).map(String)
+        });
     }
 
     // Flujo normal: crear nueva apuesta y guardar cost_usd/cost_cup
