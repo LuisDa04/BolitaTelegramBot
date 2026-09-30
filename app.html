@@ -4192,7 +4192,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             let html = '<div class="space-y-3">';
 
             if (visibleRoles.length > 0) {
-                html += `<div class="text-sm text-gray-400 mb-2">Tus permisos: ${visibleRoles.map(r => {
+                html += `<div class="text-sm text-gray-400 mb-2"><span class="font-semibold">Tus permisos:</span> ${visibleRoles.map(r => {
                     const p = privilegeLabels[r];
                     return p ? `${p.icon} ${p.label}` : r;
                 }).join(' · ')}</div>`;
