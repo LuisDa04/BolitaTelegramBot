@@ -2716,22 +2716,31 @@ app.post('/api/bets', async (req, res) => {
         const isEditMaxed = !!betId && (maxedOverall.cup.length > 0 || maxedOverall.usd.length > 0);
 
         // El usuario solo intentó apostar más a uno o varios números que ya
-        // estaban al máximo. Al recortar, la jugada queda idéntica a la
-        // guardada (o se queda vacía): no hay nada que aplicar, así que se
-        // responde con el texto exacto y se sigue editando — sin modal, sin
-        // reembolso y sin tocar saldo. Va antes de cualquier aviso para no caer
-        // en el modal de "omitir / apostar", que aquí devolvería un "No hubo
-        // cambios" sin explicar el porqué.
+        // estaban al máximo. Solo devolvemos "nada que aplicar" cuando TODOS
+        // los números de la jugada original ya están al máximo. Si hay al menos
+        // un número que NO está al máximo, no retornamos aquí para que se muestre
+        // el modal de confirmación con elección.
         if (betId && existingBet) {
             const clampedNoop = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
-            const nothingToApply = (clampedNoop.totalCUP <= 0 && clampedNoop.totalUSD <= 0)
-                || betTotalsEqual(betTotalsByNum(clampedNoop.items, betType), betTotalsByNum(existingBet.items, betType));
-            if (nothingToApply) {
-                return res.status(400).json({
-                    error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
-                    code: 'EDIT_NOTHING_TO_APPLY'
-                });
+            const originalBetNums = Object.keys(betTotalsByNum(existingBet.items, betType));
+            const maxedSet = new Set([
+                ...(maxedOverall.cup || []),
+                ...(maxedOverall.usd || [])
+            ]);
+            const allOriginalNumsMaxed = originalBetNums.length > 0
+                && originalBetNums.every(n => maxedSet.has(String(n)));
+
+            if (allOriginalNumsMaxed) {
+                const nothingToApply = (clampedNoop.totalCUP <= 0 && clampedNoop.totalUSD <= 0)
+                    || betTotalsEqual(betTotalsByNum(clampedNoop.items, betType), betTotalsByNum(existingBet.items, betType));
+                if (nothingToApply) {
+                    return res.status(400).json({
+                        error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
+                        code: 'EDIT_NOTHING_TO_APPLY'
+                    });
+                }
             }
+            // Si NO todos están al máximo, NO retornamos aquí → cae a isEditMaxed y muestra modal con elección
         }
 
         if (isEditMaxed) {
