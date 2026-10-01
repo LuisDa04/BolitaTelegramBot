@@ -2716,31 +2716,45 @@ app.post('/api/bets', async (req, res) => {
         const isEditMaxed = !!betId && (maxedOverall.cup.length > 0 || maxedOverall.usd.length > 0);
 
         // El usuario solo intentó apostar más a uno o varios números que ya
-        // estaban al máximo. Solo devolvemos "nada que aplicar" cuando TODOS
-        // los números de la jugada original ya están al máximo. Si hay al menos
-        // un número que NO está al máximo, no retornamos aquí para que se muestre
-        // el modal de confirmación con elección.
+        // estaban al máximo. El aviso que NO pregunta sale únicamente cuando no
+        // queda nada por aplicar: todos los números de la jugada original
+        // agotaron su cupo y el recorte deja la jugada idéntica a la guardada.
+        // Si queda algún número con espacio —aunque el recorte resultara
+        //noop— se cae a `isEditMaxed` para preguntar con el modal.
+        //
+        // El cupo se evalúa sobre el estado de cada número (lo que la jugada
+        // tiene + lo que tienen las OTRAS jugadas) y no sobre `maxedOverall`:
+        // esa lista solo contiene los números que el usuario INTENTÓ subir, así
+        // que un número que ya estaba en su tope sin que se toque nunca pasa
+        // por ella.
         if (betId && existingBet) {
             const clampedNoop = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
-            const originalBetNums = Object.keys(betTotalsByNum(existingBet.items, betType));
-            const maxedSet = new Set([
-                ...(maxedOverall.cup || []),
-                ...(maxedOverall.usd || [])
-            ]);
-            const allOriginalNumsMaxed = originalBetNums.length > 0
-                && originalBetNums.every(n => maxedSet.has(String(n)));
+            const originalTotals = betTotalsByNum(existingBet.items, betType);
+            const otherTotals = limitCheck.exceedData.existingTotals || {};
+            const originalNums = Object.keys(originalTotals);
+            const allNumsAtMax = originalNums.length > 0
+                && originalNums.every((n) => {
+                    const own = originalTotals[n] || { cup: 0, usd: 0 };
+                    const other = otherTotals[n] || { cup: 0, usd: 0 };
+                    const hasCup = (own.cup || 0) > 0;
+                    const hasUsd = (own.usd || 0) > 0;
+                    if (!hasCup && !hasUsd) return false;
+                    // Una moneda sin tope configurado no puede estar "agotada".
+                    if (hasCup && (limitCheck.exceedData.maxCup === null || limitCheck.exceedData.maxCup === undefined
+                        || (own.cup + (other.cup || 0)) < limitCheck.exceedData.maxCup)) return false;
+                    if (hasUsd && (limitCheck.exceedData.maxUsd === null || limitCheck.exceedData.maxUsd === undefined
+                        || (own.usd + (other.usd || 0)) < limitCheck.exceedData.maxUsd)) return false;
+                    return true;
+                });
 
-            if (allOriginalNumsMaxed) {
-                const nothingToApply = (clampedNoop.totalCUP <= 0 && clampedNoop.totalUSD <= 0)
-                    || betTotalsEqual(betTotalsByNum(clampedNoop.items, betType), betTotalsByNum(existingBet.items, betType));
-                if (nothingToApply) {
-                    return res.status(400).json({
-                        error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
-                        code: 'EDIT_NOTHING_TO_APPLY'
-                    });
-                }
+            const nothingToApply = (clampedNoop.totalCUP <= 0 && clampedNoop.totalUSD <= 0)
+                || betTotalsEqual(betTotalsByNum(clampedNoop.items, betType), originalTotals);
+            if (allNumsAtMax && nothingToApply) {
+                return res.status(400).json({
+                    error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
+                    code: 'EDIT_NOTHING_TO_APPLY'
+                });
             }
-            // Si NO todos están al máximo, NO retornamos aquí → cae a isEditMaxed y muestra modal con elección
         }
 
         if (isEditMaxed) {
