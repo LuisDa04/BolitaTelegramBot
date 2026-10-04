@@ -309,8 +309,8 @@ async function notifySessionExporters(session) {
 
     for (const adminId of botRolesCache.sessionExporters) {
         try {
-            // El superadmin siempre recibe el botón; el subadmin solo si hay apuestas,
-            // de lo contrario recibe el mensaje sin botón y con el aviso de que no hay apuestas.
+            // El botón solo se envía si hay apuestas; de lo contrario el mensaje llega
+            // sin botón y con el aviso de que no hay apuestas. Superadmins incluidos.
             const showButton = hasBets;
 
             const text =
