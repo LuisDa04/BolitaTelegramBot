@@ -311,8 +311,7 @@ async function notifySessionExporters(session) {
         try {
             // El superadmin siempre recibe el botón; el subadmin solo si hay apuestas,
             // de lo contrario recibe el mensaje sin botón y con el aviso de que no hay apuestas.
-            const isSuper = ADMIN_IDS.includes(Number(adminId));
-            const showButton = isSuper || hasBets;
+            const showButton = hasBets;
 
             const text =
                 `📊 <b>Jugadas</b>\n\n` +
@@ -407,14 +406,15 @@ async function notifyDailyBetsReport() {
 
     const hasBets = await dayHasBets(reportDate);
 
+    const showButton = hasBets;
     const text =
         `📊 <b>Jugadas del día</b>\n\n` +
         `📅 ${readableDate}\n\n` +
-        (hasBets
+        (showButton
             ? `Pulsa el botón para ver el resumen del día.`
             : `📭 No hubo apuestas en este día.`);
 
-    const replyMarkup = hasBets
+    const replyMarkup = showButton
         ? Markup.inlineKeyboard([
             [Markup.button.url('👁️ Ver resumen del día', await buildDailyReportUrl(reportDate))]
         ]).reply_markup
