@@ -5421,10 +5421,22 @@ bot.on(message('text'), async (ctx) => {
             }
             const originalText = userMsg?.text || '';
             const originalName = userMsg?.firstName || 'Usuario';
+            let targetBanned = false;
+            try {
+                const { data } = await supabase
+                    .from('users')
+                    .select('is_banned')
+                    .eq('telegram_id', targetUserId)
+                    .maybeSingle();
+                targetBanned = !!data?.is_banned;
+            } catch (e) {
+                console.warn('Error verificando baneo de usuario objetivo:', e?.message || e);
+            }
+            const bannedTag = targetBanned ? ' <b>[BANEADO]</b>' : '';
             for (const adminId of ADMIN_IDS) {
                 try {
                     await bot.telegram.sendMessage(adminId,
-                        `✉️ <b>Respuesta de ${responderName}</b>\n\n📩 <b>Mensaje original de</b> ${escapeHTML(originalName)} (${targetUserId}):\n${escapeHTML(originalText)}\n\n━━━━━━━━━━━━━━━\n📨 ${escapeHTML(text)}`,
+                        `✉️ <b>Respuesta de ${responderName}</b>\n\n📩 <b>Mensaje original de</b> ${escapeHTML(originalName)} (${targetUserId})${bannedTag}:\n${escapeHTML(originalText)}\n\n━━━━━━━━━━━━━━━\n📨 ${escapeHTML(text)}`,
                         { parse_mode: 'HTML' }
                     );
                 } catch (e) {
