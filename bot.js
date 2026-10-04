@@ -1193,6 +1193,13 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
 
     function isPlausible(currency, value) {
         if (value == null || isNaN(value)) return false;
+        // Rangos absolutos en CUP para evitar confusiones con columnas (USD vs CUP)
+        if (currency === 'TRX') {
+            return value >= 100 && value <= 500; // rango razonable para TRX en CUP
+        }
+        if (currency === 'USDT') {
+            return value >= 600 && value <= 1000; // rango razonable para USDT en CUP
+        }
         const base = currency === 'USDT' ? dbUsdt : dbTrx;
         if (base != null && base > 0) {
             return value >= (base - 200) && value <= (base + 200);
@@ -1219,8 +1226,19 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
         for (const cand of (candidates || [])) {
             const val = normalizeNumber(cand);
             if (val == null || !isPlausible(currency, val)) continue;
-            const dist = base != null && base > 0 ? Math.abs(val - base) : 0;
+            const dist = (base != null && base > 0 && Math.abs(val - base) <= 200) ? Math.abs(val - base) : 0;
             if (dist < bestDist) { best = val; bestDist = dist; }
+            else if (best == null) {
+                best = val;
+                bestDist = Infinity;
+            }
+        }
+        if (best == null) {
+            for (const cand of (candidates || [])) {
+                const val = normalizeNumber(cand);
+                if (val == null || !isPlausible(currency, val)) continue;
+                if (best == null || val < best) best = val;
+            }
         }
         return best;
     }
@@ -1240,7 +1258,15 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
                 const key = cur.toLowerCase();
                 if (result[key] != null) continue;
                 if (!line.includes(cur)) continue;
-                result[key] = pickBest(cur, line.match(/\d[\d.,]*/g));
+                const cands = line.match(/\d[\d.,]*/g);
+                if (cur === 'TRX') {
+                    const cupCands = (cands || []).map(normalizeNumber).filter(v => v != null && v >= 100 && v <= 500);
+                    if (cupCands.length > 0) {
+                        result.trx = Math.max(...cupCands);
+                        continue;
+                    }
+                }
+                result[key] = pickBest(cur, cands);
             }
         }
         if (result.usdt != null && result.trx != null) return result;
@@ -1253,7 +1279,15 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
             const idx = flat.indexOf(cur);
             if (idx === -1) continue;
             const window = flat.substring(idx + cur.length, idx + cur.length + 300);
-            result[key] = pickBest(cur, window.match(/\d[\d.,]*/g));
+            const cands = window.match(/\d[\d.,]*/g);
+            if (cur === 'TRX') {
+                const cupCands = (cands || []).map(normalizeNumber).filter(v => v != null && v >= 100 && v <= 500);
+                if (cupCands.length > 0) {
+                    result.trx = Math.max(...cupCands);
+                    continue;
+                }
+            }
+            result[key] = pickBest(cur, cands);
         }
         if (result.usdt != null && result.trx != null) return result;
 
