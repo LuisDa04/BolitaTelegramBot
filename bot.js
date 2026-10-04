@@ -2083,14 +2083,25 @@ function admissibleLinesForNumbers(items, betType, exceedData) {
 // Se usa tanto en el flujo normal como al confirmar el recorte al máximo permitido.
 
 // Devuelve el sustantivo correcto para referirse a los tipos de apuesta
-// excedidos: números (fijo/corridos), centenas y/o parlets.
-function overLimitTypePhrase(betTypes) {
+// excedidos: números (fijo/corridos), centenas y/o parlets. El artículo va
+// incluido. El singular va en minúscula porque se usa dentro de una frase en
+// medio del texto; el plural conserva la mayúscula porque siempre abre la frase.
+// `singular` fuerza el singular aunque se combinen varios tipos, que es lo que
+// hace falta cuando el aviso habla de un único número de la jugada.
+// Las apuestas son de un solo tipo, así que los llamantes siempre pasan un
+// array con un elemento; las combinaciones de 2 y 3 tipos son defensivas.
+function overLimitTypePhrase(betTypes, { singular = false } = {}) {
     const unique = [...new Set((betTypes || []).map(t => String(t || '').toLowerCase()))];
     const withArticles = [];
     if (unique.includes('fijo') || unique.includes('corridos')) withArticles.push('números');
     if (unique.includes('centena')) withArticles.push('centenas');
     if (unique.includes('parle')) withArticles.push('parlets');
-    if (withArticles.length === 0) return 'números';
+    if (withArticles.length === 0) return singular ? 'el número' : 'números';
+    if (singular) {
+        const one = withArticles[0];
+        const noun = one.replace(/s$/, '');
+        return (one === 'centenas' ? 'la ' : 'el ') + noun;
+    }
     if (withArticles.length === 1) {
         return withArticles[0] === 'centenas' ? 'Las centenas' : `Los ${withArticles[0]}`;
     }
@@ -2099,6 +2110,28 @@ function overLimitTypePhrase(betTypes) {
         return `${first} y ${withArticles[1]}`;
     }
     return 'Los números, centenas y parlets';
+}
+
+// Números de la jugada que excedieron el máximo y por lo tanto van a recortarse
+// u omitirse. Se cruza exceedData con los items reales porque exceedData puede
+// traer números de otras apuestas. Lo usa la confirmación final para saber si el
+// aviso debe ir en singular o en plural.
+function exceededNumsInItems(items, betType, exceedData) {
+    if (!exceedData) return [];
+    const exceeded = new Set([
+        ...(exceedData.cupExceeders || []),
+        ...(exceedData.usdExceeders || [])
+    ].map(String));
+    if (exceeded.size === 0) return [];
+    const seen = new Set();
+    for (const item of items || []) {
+        const num = betType === 'parle'
+            ? (normalizeParleValue(item.numero) || item.numero)
+            : item.numero;
+        const key = String(num);
+        if (exceeded.has(key)) seen.add(key);
+    }
+    return [...seen];
 }
 
 async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawText, items, totalCUP, totalUSD, session }) {
@@ -2324,12 +2357,26 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
             confirmMsg += `\n\n🎁 ${verboBono} ${bonusUsed.toFixed(2)} CUP de tu bono.`;
         }
     }
-    if (arguments[1] && arguments[1].clamped) {
-        confirmMsg += `\n\nℹ️ ${overLimitTypePhrase([betType])} que excedían el máximo se ajustaron al monto permitido.`;
+    // Los avisos de recorte y de omisión concuerdan en número y género con los
+    // tipos de apuesta afectados: cuando el aviso habla de un solo número, el
+    // sustantivo va en singular y los verbos también ("El número que excedía el
+    // máximo se ajustó..."). Sin exceededNums se mantiene el plural de siempre.
+    const overLimitOpts = arguments[1] || {};
+    const overLimitSingular = (overLimitOpts.exceededNums || []).length === 1;
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const overLimitPhrase = capitalize(overLimitSingular
+        ? overLimitTypePhrase([betType], { singular: true })
+        : overLimitTypePhrase([betType]));
+    const exceedVerb = overLimitSingular ? 'excedía' : 'excedían';
+    if (overLimitOpts.clamped) {
+        const adjustVerb = overLimitSingular ? 'se ajustó' : 'se ajustaron';
+        confirmMsg += `\n\nℹ️ ${overLimitPhrase} que ${exceedVerb} el máximo ${adjustVerb} al monto permitido.`;
     }
-    if (arguments[1] && arguments[1].omitted) {
-        const omitVerb = betType === 'centena' ? 'fueron omitidas' : 'fueron omitidos';
-        confirmMsg += `\n\n🚫 ${overLimitTypePhrase([betType])} que excedían el máximo ${omitVerb}.`;
+    if (overLimitOpts.omitted) {
+        const omitVerb = overLimitSingular
+            ? (betType === 'centena' ? 'fue omitida' : 'fue omitido')
+            : (betType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
+        confirmMsg += `\n\n🚫 ${overLimitPhrase} que ${exceedVerb} el máximo ${omitVerb}.`;
     }
     await ctx.reply(confirmMsg, { parse_mode: 'HTML' });
 
@@ -3299,7 +3346,8 @@ bot.action('bet_override_accept', async (ctx) => {
             totalCUP: clamped.totalCUP,
             totalUSD: clamped.totalUSD,
             session: ctx.session,
-            clamped: true
+            clamped: true,
+            exceededNums: exceededNumsInItems(items, betType, exceedData)
         });
         // Eliminar el mensaje de confirmación de recorte (la jugada ya se confirmó
         // arriba; si falló, placeBetAndConfirm ya notificó el error al usuario).
@@ -3363,7 +3411,8 @@ bot.action('bet_override_reject', async (ctx) => {
             totalCUP: omitted.totalCUP,
             totalUSD: omitted.totalUSD,
             session: ctx.session,
-            omitted: true
+            omitted: true,
+            exceededNums: exceededNumsInItems(items, betType, exceedData)
         });
         // Eliminar el mensaje de confirmación del recorte (la jugada ya se confirmó
         // arriba; si falló, placeBetAndConfirm ya notificó el error al usuario).
