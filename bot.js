@@ -309,8 +309,9 @@ async function notifySessionExporters(session) {
 
     for (const adminId of botRolesCache.sessionExporters) {
         try {
-            // El botón solo se envía si hay apuestas; de lo contrario el mensaje llega
-            // sin botón y con el aviso de que no hay apuestas. Superadmins incluidos.
+            // El botón solo se envía si hay apuestas. El superadmin no hace excepción:
+            // solo entra en este bucle si tiene el privilegio session_exporter (es la
+            // audiencia), así que no hace falta ninguna comprobación de rol aparte.
             const showButton = hasBets;
 
             const text =

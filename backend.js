@@ -4095,13 +4095,13 @@ app.post('/api/admin/lottery-sessions/toggle', requireAdmin, async (req, res) =>
         const hasBets = (betCount || 0) > 0;
         for (const r of rolesData || []) {
             try {
-                // El botón solo se envía si hay apuestas; de lo contrario el mensaje llega
-                // sin botón y con el aviso de que no hay apuestas. Superadmins incluidos:
-                // mismo criterio que notifySessionExporters en bot.js.
+                // El botón solo se envía si hay apuestas. El superadmin no hace excepción:
+                // solo entra en este bucle si tiene el privilegio session_exporter (es la
+                // audiencia), así que no hace falta ninguna comprobación de rol aparte.
                 const showButton = hasBets;
                 await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     chat_id: Number(r.telegram_id),
-                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\n${showButton ? 'Pulsa el botón para ver las apuestas de la sesión.' : '📭 No hay apuestas en esta sesión.'}`,
+                    text: `📊 <b>Jugadas</b>\n\n🎰 ${data.lottery} · <b>${data.time_slot}</b>\n📅 ${data.date}\n\n${showButton ? 'Pulsa el botón para ver las apuestas de la sesión.' : '📭 No hubo apuestas en esta sesión.'}`,
                     parse_mode: 'HTML',
                     reply_markup: showButton ? {
                         inline_keyboard: [[{ text: '👁️ Ver apuestas de la sesión', url: await buildSessionExportUrl(data.id) }]]
