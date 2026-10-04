@@ -2807,12 +2807,16 @@ bot.use(async (ctx, next) => {
             // que toque /start. Si es un usuario completamente nuevo, se le da la
             // bienvenida con cualquier interacción.
             if (ctx.session?.isNewUser) {
+                const isCallback = ctx.updateType === 'callback_query';
+                const isUserMessage = ctx.updateType === 'message';
                 const msgText = ctx.message?.text || '';
-                // Updates sin texto (my_chat_member, etc.) no deben disparar la
-                // redirección ni la bienvenida; solo updates de mensaje/callback
-                // con contenido. Esto evita que el desbloqueo del bot (que llega
-                // antes de /start) enviar el aviso de "selecciona el botón Inicio".
-                if (!msgText) return next();
+                // Updates de servicio sin texto ni callback (my_chat_member, inline_query,
+                // etc.) no deben disparar la redirección ni la bienvenida. Solo se
+                // bloquean las interacciones reales del usuario: texto, botones
+                // (callback_query) y adjuntos (fotos/stickers/documentos).
+                // Esto evita que el desbloqueo del bot (que llega antes de /start)
+                // envíe el aviso de "selecciona el botón Inicio".
+                if (!msgText && !isCallback && !isUserMessage) return next();
                 if (!/^\/start(?:\s|$)/.test(msgText)) {
                     if (ctx.session?.isDeletedUser) {
                         try {
@@ -2824,11 +2828,14 @@ bot.use(async (ctx, next) => {
                         } catch (blockErr) {
                             console.error('Error enviando aviso a usuario re-registrado:', blockErr);
                         }
-                        if (ctx.updateType === 'callback_query') {
+                        if (isCallback) {
                             await ctx.answerCbQuery().catch(() => {});
                         }
                         return;
                     }
+                    // Un usuario nuevo (no eliminado) que pulsa un botón sí opera
+                    // con normalidad: solo se le da la bienvenida cuando escribe.
+                    if (isCallback) return next();
                     try {
                         await sendNewUserWelcome(ctx);
                     } catch (welcomeErr) {
