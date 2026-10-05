@@ -1576,12 +1576,18 @@ function maxedSentences(betType, maxed, exceedData) {
     return sentences;
 }
 
-// Texto del aviso al editar cuando hay números ya apostados a su máximo.
-// Una frase por moneda (CUP primero, luego USD) y la pregunta una sola vez.
-function maxedNoticeText(betType, maxed, exceedData) {
+// Texto del aviso cuando hay números ya apostados a su máximo, tanto al editar
+// como al registrar una apuesta nueva. Una frase por moneda (CUP primero, luego
+// USD) y la pregunta una sola vez. La pregunta nombra el flujo —"edición" al
+// editar, "apuesta" al registrar— para que una apuesta nueva no hable de
+// editar algo que el usuario está creando ahora.
+function maxedNoticeText(betType, maxed, exceedData, { esEdicion = true } = {}) {
     const sentences = maxedSentences(betType, maxed, exceedData);
     if (sentences.length === 0) return null;
-    return `${sentences.map(s => `⚠️ ${s}`).join(' ')}\n¿Deseas continuar con la edición?`;
+    const pregunta = esEdicion
+        ? '¿Deseas continuar con la edición?'
+        : '¿Deseas continuar con la apuesta?';
+    return `${sentences.map(s => `⚠️ ${s}`).join(' ')}\n${pregunta}`;
 }
 
 // Aviso que NO pregunta: se usa cuando la edición no tiene nada que aplicar
@@ -2697,12 +2703,14 @@ app.post('/api/bets', async (req, res) => {
         sessionId: sessionId || null,
         excludeBetId: betId || null
     });
-    // Números ya apostados a su máximo que la edición no puede aumentar. En una
-    // edición no se bloquea: se pregunta y, al continuar, esos números se quedan
-    // en el tope (conservando el monto que la jugada ya tenía) y se aplican el
-    // resto de los cambios de la jugada.
-    let maxedOnEdit = null;
+    // Números ya apostados a su máximo que la jugada no puede aumentar. No se
+    // bloquean: se pregunta y, al continuar, esos números quedan en su tope
+    // (conservando el monto que ya tenían, o en 0 si no les cabe nada) y se
+    // aplica el resto de la jugada. Aplica igual al editar y al registrar una
+    // apuesta nueva.
+    let maxedFlow = null;
     if (!limitCheck.ok) {
+        const esEdicion = !!betId;
         // Montos que la apuesta en edición ya tiene por número. La jugada queda
         // fuera de `existingTotals`, así que "ya está al máximo" hay que
         // juzgarlo sumando ambas partes: esta jugada + las otras.
@@ -2713,7 +2721,7 @@ app.post('/api/bets', async (req, res) => {
         // inadvertido y la edición caería en el modal clásico de "apostar hasta
         // el máximo" en vez de preguntar con el aviso ⚠️.
         const maxedOverall = maxedExceeders(limitCheck.exceedData, currentTotals);
-        const isEditMaxed = !!betId && (maxedOverall.cup.length > 0 || maxedOverall.usd.length > 0);
+        const hayMaxed = maxedOverall.cup.length > 0 || maxedOverall.usd.length > 0;
 
         // El usuario solo intentó apostar más a uno o varios números que ya
         // estaban al máximo. Al recortar, la jugada queda idéntica a la
@@ -2734,8 +2742,20 @@ app.post('/api/bets', async (req, res) => {
             }
         }
 
-        if (isEditMaxed) {
-            maxedOnEdit = maxedOverall;
+        // En una apuesta NUEVA, un número ya en su tope no puede tumbar la línea
+        // entera: los demás números de la jugada son válidos y el usuario debe
+        // poder registrarlos. Se pregunta con el mismo aviso ⚠️ y, al continuar,
+        // ese número se omite y se aplica el resto. Si el recorte no deja NADA
+        // aplicable (todos los números de la línea estaban en su tope), no hay
+        // nada que preguntar y sigue el error plano de siempre.
+        let isMaxedFlow = hayMaxed;
+        if (isMaxedFlow && !esEdicion) {
+            const prueba = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
+            isMaxedFlow = prueba.totalCUP > 0 || prueba.totalUSD > 0;
+        }
+
+        if (isMaxedFlow) {
+            maxedFlow = maxedOverall;
             if (req.body.confirmLimitOverride === true) {
                 // Confirmado: el recorte ajusta a `máximo − otras jugadas` cada
                 // número excedido. Para los que ya estaban en su tope eso es
@@ -2753,7 +2773,7 @@ app.post('/api/bets', async (req, res) => {
                         code: 'EDIT_NOTHING_TO_APPLY'
                     });
                 }
-                maxedOnEdit.dropped = [...numsBeforeClamp]
+                maxedFlow.dropped = [...numsBeforeClamp]
                     .filter(n => !clamped.items.some(it => String(betNumOf(it, betType)) === n));
                 parsed.items = clamped.items;
                 totalCUP = clamped.totalCUP;
@@ -2761,8 +2781,8 @@ app.post('/api/bets', async (req, res) => {
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
             } else {
                 return res.status(400).json({
-                    error: maxedNoticeText(betType, maxedOverall, limitCheck.exceedData),
-                    code: 'MAXED_NUMBERS_ON_EDIT',
+                    error: maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion }),
+                    code: esEdicion ? 'MAXED_NUMBERS_ON_EDIT' : 'MAXED_NUMBERS_ON_BET',
                     maxedCup: maxedOverall.cup,
                     maxedUsd: maxedOverall.usd
                 });
@@ -3170,7 +3190,7 @@ app.post('/api/bets', async (req, res) => {
             success: true,
             bet: updatedBet,
             updatedUser,
-            droppedMaxedNums: (maxedOnEdit?.dropped || []).map(String)
+            droppedMaxedNums: (maxedFlow?.dropped || []).map(String)
         });
     }
 
