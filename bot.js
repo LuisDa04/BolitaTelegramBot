@@ -5840,6 +5840,13 @@ bot.on(message('text'), async (ctx) => {
             return;
         }
         const rate = percent / 100;
+        // El valor guardado es la fracción (5% -> 0.05). Si no cambia, avisar y seguir esperando
+        // el nuevo valor (no se borra session.adminAction, igual que las tasas de cambio).
+        const current = await getReferralCommissionRate();
+        if (Math.abs(current - rate) < 1e-9) {
+            await ctx.reply('❌ Esta comisión ya está registrada.');
+            return;
+        }
         await supabase
             .from('app_config')
             .upsert({ key: 'referral_commission_rate', value: rate.toString() }, { onConflict: 'key' });

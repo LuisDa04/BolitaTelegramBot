@@ -3808,6 +3808,11 @@ app.put('/api/admin/config', requireAdmin, async (req, res) => {
         await supabase.from('app_config').upsert({ key: 'bonus_cup_default', value: bonusCupDefault.toString() }, { onConflict: 'key' });
     }
     if (referralRate !== undefined) {
+        // Misma regla que PUT /api/admin/referral-rate: no reescribir la comisión si no cambia.
+        const current = await getReferralCommissionRate();
+        if (Math.abs(current - parseFloat(referralRate)) < 1e-9) {
+            return res.status(409).json({ error: 'Esta comisión ya está registrada.' });
+        }
         await supabase.from('app_config').upsert({ key: 'referral_commission_rate', value: referralRate.toString() }, { onConflict: 'key' });
     }
     res.json({ success: true });
@@ -3947,6 +3952,12 @@ app.put('/api/admin/referral-rate', requireAdmin, async (req, res) => {
     const { rate } = req.body;
     if (rate === undefined || isNaN(parseFloat(rate)) || parseFloat(rate) < 0) {
         return res.status(400).json({ error: 'Tasa inválida' });
+    }
+    // La tasa se guarda como fracción (5% -> 0.05), misma unidad que recibe este endpoint.
+    // El epsilon absorbe ruido de coma flotante sin tapar un cambio real (0.01pp = 1e-4).
+    const current = await getReferralCommissionRate();
+    if (Math.abs(current - parseFloat(rate)) < 1e-9) {
+        return res.status(409).json({ error: 'Esta comisión ya está registrada.' });
     }
     await supabase
         .from('app_config')
