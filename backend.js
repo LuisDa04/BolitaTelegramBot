@@ -1405,8 +1405,10 @@ function clampItemsToMax(items, betType, exceedData) {
 
 // Omite las porciones (por moneda) que exceden el máximo permitido. Devuelve los
 // items restantes y sus totales. Si no queda nada, totalCUP/totalUSD serán 0.
+// También devuelve omittedItems (lo que se quedó fuera) para poder redactar el
+// aviso en singular o plural según cuántos números se omitieron.
 function omitExceededNumbers(items, betType, exceedData) {
-    if (!exceedData) return { items, totalCUP: 0, totalUSD: 0 };
+    if (!exceedData) return { items, totalCUP: 0, totalUSD: 0, omittedItems: [] };
     const cupExceeded = new Set((exceedData.cupExceeders || []).map(String));
     const usdExceeded = new Set((exceedData.usdExceeders || []).map(String));
     const newItems = items.filter(item => {
@@ -1424,7 +1426,8 @@ function omitExceededNumbers(items, betType, exceedData) {
         totalCUP += it.cup !== undefined ? parseFloat(it.cup) : (it.currency === 'CUP' ? parseFloat(it.amount) : 0);
         totalUSD += it.usd !== undefined ? parseFloat(it.usd) : (it.currency === 'USD' ? parseFloat(it.amount) : 0);
     }
-    return { items: newItems, totalCUP, totalUSD };
+    const omittedItems = items.filter(item => !newItems.includes(item));
+    return { items: newItems, totalCUP, totalUSD, omittedItems };
 }
 
 // Devuelve una línea de "Monto admisible" por cada número excedido que aún se
@@ -2709,6 +2712,9 @@ app.post('/api/bets', async (req, res) => {
     // aplica el resto de la jugada. Aplica igual al editar y al registrar una
     // apuesta nueva.
     let maxedFlow = null;
+    // Números que el usuario eligió omitir al confirmar el modal clásico. Se
+    // devuelven al cliente para que redacte el aviso en singular o plural.
+    let omittedNums = [];
     if (!limitCheck.ok) {
         const esEdicion = !!betId;
         // Montos que la apuesta en edición ya tiene por número. La jugada queda
@@ -2804,12 +2810,19 @@ app.post('/api/bets', async (req, res) => {
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
             } else if (req.body.omitLimitOverride === true) {
                 const omitted = omitExceededNumbers(parsed.items, betType, limitCheck.exceedData);
+                omittedNums = [...new Set(omitted.omittedItems.map(it => String(betNumOf(it, betType))))];
                 if (omitted.totalCUP <= 0 && omitted.totalUSD <= 0) {
                     const isCentena = betType === 'centena';
-                    const pluralArticle = isCentena ? 'todas las' : 'todos los';
-                    const pluralType = (betType === 'fijo' || betType === 'corridos') ? 'números' : isCentena ? 'centenas' : betType === 'parle' ? 'parlets' : betType;
-                    const adjective = isCentena ? 'apostadas' : 'apostados';
-                    return res.status(400).json({ error: `❌ Has omitido ${pluralArticle} ${pluralType} ${adjective}. Por lo cual la jugada queda cancelada.` });
+                    // Si la jugada se canceló por quedarle un solo número omitido,
+                    // el aviso va en singular; con varios (o ninguno, que no debería
+                    // pasar aquí) se mantiene el plural de siempre.
+                    const one = omitted.omittedItems.length === 1;
+                    const article = isCentena ? (one ? 'toda la' : 'todas las') : (one ? 'todo el' : 'todos los');
+                    const typeWord = (betType === 'fijo' || betType === 'corridos') ? (one ? 'número' : 'números')
+                        : isCentena ? (one ? 'centena' : 'centenas')
+                            : betType === 'parle' ? (one ? 'parlet' : 'parlets') : betType;
+                    const adjective = isCentena ? (one ? 'apostada' : 'apostadas') : (one ? 'apostado' : 'apostados');
+                    return res.status(400).json({ error: `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada.` });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
@@ -3186,11 +3199,13 @@ app.post('/api/bets', async (req, res) => {
         const updatedUser = await getOrCreateUser(parseInt(userId));
         // Si el recorte descartó números ya apostados a su máximo, se devuelven
         // para que la web lo diga explícitamente en el aviso de "Jugada editada".
+        // omittedNums es lo mismo pero para lo que el usuario eligió omitir.
         return res.json({
             success: true,
             bet: updatedBet,
             updatedUser,
-            droppedMaxedNums: (maxedFlow?.dropped || []).map(String)
+            droppedMaxedNums: (maxedFlow?.dropped || []).map(String),
+            omittedNums
         });
     }
 
@@ -3367,7 +3382,7 @@ app.post('/api/bets', async (req, res) => {
         }
     }
     const updatedUser = await getOrCreateUser(parseInt(userId));
-    res.json({ success: true, bet, updatedUser });
+    res.json({ success: true, bet, updatedUser, omittedNums });
     });
 });
 

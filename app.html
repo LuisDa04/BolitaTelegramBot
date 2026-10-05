@@ -1761,9 +1761,19 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     // Al confirmar el aviso de "ya al máximo", el servidor descarta
                     // esos números: decirlo explícito en vez de un "¡Buena suerte!" mudo.
                     const droppedMaxed = Array.isArray(data.droppedMaxedNums) ? data.droppedMaxedNums.filter(n => n !== '' && n != null) : [];
+                    // Igual que droppedMaxed, pero para lo que se omitió al elegir
+                    // "No, omitir" en el modal clásico. Sin esto había que asumir el
+                    // plural y se escribía "Se omitieron los números..." aunque
+                    // hubiera quedado fuera uno solo.
+                    const omittedNums = Array.isArray(data.omittedNums) ? data.omittedNums.filter(n => n !== '' && n != null) : [];
                     let successMsg = '¡Buena suerte!';
                     if (wasOmitted) {
-                        successMsg = `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.`;
+                        if (omittedNums.length === 1) {
+                            const singularPhrase = overLimitTypePhrase([selectedBetType], { singular: true });
+                            successMsg = `Se omitió ${singularPhrase} ${omittedNums[0]} por exceder el máximo permitido.`;
+                        } else {
+                            successMsg = `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.`;
+                        }
                     } else if (droppedMaxed.length > 0) {
                         const pluralDropped = droppedMaxed.length > 1;
                         // Un solo número: artículo y sustantivo en singular, con el
