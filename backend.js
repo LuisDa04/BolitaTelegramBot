@@ -3805,6 +3805,12 @@ app.get('/api/admin/config', requireAdmin, async (req, res) => {
 app.put('/api/admin/config', requireAdmin, async (req, res) => {
     const { bonusCupDefault, referralRate } = req.body;
     if (bonusCupDefault !== undefined) {
+        // Mismo criterio que las tasas de cambio: no reescribir el bono si el admin confirma el valor actual.
+        // El epsilon absorbe ruido de coma flotante sin tapar un cambio real (el input va en pasos de 0.01).
+        const currentBonus = await getBonusCupDefault();
+        if (Math.abs(currentBonus - parseFloat(bonusCupDefault)) < 1e-9) {
+            return res.status(409).json({ error: 'Este valor ya está registrado.' });
+        }
         await supabase.from('app_config').upsert({ key: 'bonus_cup_default', value: bonusCupDefault.toString() }, { onConflict: 'key' });
     }
     if (referralRate !== undefined) {
