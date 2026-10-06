@@ -507,7 +507,31 @@ function formatBotDisplayName(name) {
     return display.endsWith('®') ? display : display + '®';
 }
 
-function buildLastBetsText(bets) {
+// Emoji del turno (sesión) a mostrar delante del nombre de la lotería en
+// "Mis jugadas". Espejo de turnEmoji() de backend.js; si no se conoce el turno
+// no se pone ningún emoji (el mensaje queda como siempre).
+function turnEmoji(slot) {
+    const s = String(slot || '').toLowerCase();
+    if (s.includes('mañana')) return '🌅';
+    if (s.includes('tarde')) return '☀️';
+    if (s.includes('noche')) return '🌙';
+    return '';
+}
+
+async function buildLastBetsText(bets) {
+    // La apuesta solo guarda session_id: hay que leer el turno de la sesión para
+    // poder anteponer su emoji al nombre de la lotería. Una sola consulta con los
+    // session_id distintos, nunca una por apuesta.
+    const sessionIds = [...new Set((bets || []).map(b => b.session_id).filter(Boolean))];
+    const slotBySession = {};
+    if (sessionIds.length) {
+        const { data: sessions } = await supabase
+            .from('lottery_sessions')
+            .select('id, time_slot')
+            .in('id', sessionIds);
+        (sessions || []).forEach(s => { slotBySession[s.id] = s.time_slot; });
+    }
+
     let text = '📋 <b>Tus últimas 5 jugadas:</b>\n\n';
 
     bets.forEach((b, i) => {
@@ -515,6 +539,7 @@ function buildLastBetsText(bets) {
         const edited = b.updated_at && new Date(b.updated_at) - new Date(b.placed_at) > 60000
             ? moment(b.updated_at).tz(TIMEZONE).format('hh:mm A')
             : null;
+        const turn = turnEmoji(b.session_id != null ? slotBySession[b.session_id] : null);
         const lottery = escapeHTML(b.lottery || '-');
         const betType = escapeHTML(formatBetTypeLabel(b.bet_type) || '-');
         const rawTextLines = String(b.raw_text || '')
@@ -527,7 +552,7 @@ function buildLastBetsText(bets) {
         const usd = (parseFloat(b.cost_usd) || 0).toFixed(2);
 
         text += `<b>${i + 1}.</b>\n` +
-            `<pre>Lotería    : ${lottery}\nTipo       : ${betType}\nJugada:\n${rawText}\nMonto      : ${cup} CUP / ${usd} USD\nRegistrada : ${created}` +
+            `<pre>Lotería    : ${turn}${turn ? ' ' : ''}${lottery}\nTipo       : ${betType}\nJugada:\n${rawText}\nMonto      : ${cup} CUP / ${usd} USD\nRegistrada : ${created}` +
             (edited ? `\nEditada    : ${edited}` : '') +
             `</pre>\n`;
     });
@@ -3034,7 +3059,7 @@ bot.command('mis_jugadas', async (ctx) => {
             getMainKeyboard(ctx)
         );
     } else {
-        const text = buildLastBetsText(bets);
+        const text = await buildLastBetsText(bets);
         await safeEdit(ctx, text, getMainKeyboard(ctx));
     }
 });
@@ -3730,7 +3755,7 @@ bot.action('my_bets', async (ctx) => {
             getMainKeyboard(ctx)
         );
     } else {
-        const text = buildLastBetsText(bets);
+        const text = await buildLastBetsText(bets);
         await safeEdit(ctx, text, getMainKeyboard(ctx));
     }
 });
@@ -5557,7 +5582,7 @@ bot.on(message('text'), async (ctx) => {
                     getMainKeyboard(ctx)
                 );
             } else {
-                const text = buildLastBetsText(bets);
+                const text = await buildLastBetsText(bets);
                 await safeEdit(ctx, text, getMainKeyboard(ctx));
             }
             return;
