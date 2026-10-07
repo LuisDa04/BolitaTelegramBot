@@ -2817,7 +2817,7 @@ app.post('/api/bets', async (req, res) => {
                     // el aviso va en singular; con varios (o ninguno, que no debería
                     // pasar aquí) se mantiene el plural de siempre.
                     const one = omitted.omittedItems.length === 1;
-                    const article = isCentena ? (one ? 'toda la' : 'todas las') : (one ? 'todo el' : 'todos los');
+                    const article = isCentena ? (one ? 'la' : 'todas las') : (one ? 'el' : 'todos los');
                     const typeWord = (betType === 'fijo' || betType === 'corridos') ? (one ? 'número' : 'números')
                         : isCentena ? (one ? 'centena' : 'centenas')
                             : betType === 'parle' ? (one ? 'parlet' : 'parlets') : betType;
