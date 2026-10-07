@@ -6284,7 +6284,8 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                         approvedDeposits.forEach((d, i) => {
                             const date = new Date(d.created_at).toLocaleString('es-CU', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                             let cupLabel = '';
-                            if (d.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(d.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
+                            if (d.currency === 'USD') cupLabel = ` <span class="text-gray-400">(${(parseFloat(d.amount) * exchangeRates.rate).toFixed(2)} CUP)</span>`;
+                            else if (d.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(d.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
                             else if (d.currency === 'USDT') cupLabel = ` <span class="text-gray-400">(${(parseFloat(d.amount) * exchangeRates.rate_usdt).toFixed(2)} CUP)</span>`;
                             else if (d.currency === 'TRX') cupLabel = ` <span class="text-gray-400">(${(parseFloat(d.amount) * exchangeRates.rate_trx).toFixed(2)} CUP)</span>`;
                             depositsHtml += `
@@ -6308,7 +6309,8 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                         approvedWithdraws.forEach((w, i) => {
                             const date = new Date(w.created_at).toLocaleString('es-CU', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                             let cupLabel = '';
-                            if (w.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(w.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
+                            if (w.currency === 'USD') cupLabel = ` <span class="text-gray-400">(${(parseFloat(w.amount) * exchangeRates.rate).toFixed(2)} CUP)</span>`;
+                            else if (w.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(w.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
                             else if (w.currency === 'USDT') cupLabel = ` <span class="text-gray-400">(${(parseFloat(w.amount) * exchangeRates.rate_usdt).toFixed(2)} CUP)</span>`;
                             else if (w.currency === 'TRX') cupLabel = ` <span class="text-gray-400">(${(parseFloat(w.amount) * exchangeRates.rate_trx).toFixed(2)} CUP)</span>`;
                             withdrawsHtml += `
@@ -6386,7 +6388,8 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                                 allRej.forEach((r, i) => {
                                     const date = new Date(r.created_at).toLocaleString('es-CU', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
                                     let cupLabel = '';
-                                    if (r.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(r.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
+                                    if (r.currency === 'USD') cupLabel = ` <span class="text-gray-400">(${(parseFloat(r.amount) * exchangeRates.rate).toFixed(2)} CUP)</span>`;
+                                    else if (r.currency === 'MLC') cupLabel = ` <span class="text-gray-400">(${(parseFloat(r.amount) * exchangeRates.rate_mlc).toFixed(2)} CUP)</span>`;
                                     else if (r.currency === 'USDT') cupLabel = ` <span class="text-gray-400">(${(parseFloat(r.amount) * exchangeRates.rate_usdt).toFixed(2)} CUP)</span>`;
                                     else if (r.currency === 'TRX') cupLabel = ` <span class="text-gray-400">(${(parseFloat(r.amount) * exchangeRates.rate_trx).toFixed(2)} CUP)</span>`;
                                     bodyHtml += `<div class="bg-gray-800/40 p-2 rounded text-sm flex justify-between items-center">
