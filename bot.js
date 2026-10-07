@@ -2404,7 +2404,7 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
         const omitVerb = overLimitSingular
             ? (betType === 'centena' ? 'fue omitida' : 'fue omitido')
             : (betType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
-        confirmMsg += `\n\n🚫 ${overLimitPhrase} que ${exceedVerb} el máximo ${omitVerb}.`;
+        confirmMsg += `\n\n🚫 ${overLimitPhrase} que ${exceedVerb} el monto máximo ${omitVerb}.`;
     }
     await ctx.reply(confirmMsg, { parse_mode: 'HTML' });
 
