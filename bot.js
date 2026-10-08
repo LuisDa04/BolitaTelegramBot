@@ -507,7 +507,7 @@ function formatBotDisplayName(name) {
     return display.endsWith('®') ? display : display + '®';
 }
 
-// Emoji del turno (sesión) a mostrar delante del nombre de la lotería en
+// Emoji del turno (sesión) a mostrar detrás del nombre de la lotería en
 // "Mis jugadas". Espejo de turnEmoji() de backend.js; si no se conoce el turno
 // no se pone ningún emoji (el mensaje queda como siempre).
 function turnEmoji(slot) {
@@ -520,7 +520,7 @@ function turnEmoji(slot) {
 
 async function buildLastBetsText(bets) {
     // La apuesta solo guarda session_id: hay que leer el turno de la sesión para
-    // poder anteponer su emoji al nombre de la lotería. Una sola consulta con los
+    // poder colocar su emoji detrás del nombre de la lotería. Una sola consulta con los
     // session_id distintos, nunca una por apuesta.
     const sessionIds = [...new Set((bets || []).map(b => b.session_id).filter(Boolean))];
     const slotBySession = {};
@@ -552,7 +552,7 @@ async function buildLastBetsText(bets) {
         const usd = (parseFloat(b.cost_usd) || 0).toFixed(2);
 
         text += `<b>${i + 1}.</b>\n` +
-            `<pre>Lotería    : ${turn}${turn ? ' ' : ''}${lottery}\nTipo       : ${betType}\nJugada:\n${rawText}\nMonto      : ${cup} CUP / ${usd} USD\nRegistrada : ${created}` +
+            `<pre>Lotería    : ${lottery}${turn ? ' ' + turn : ''}\nTipo       : ${betType}\nJugada:\n${rawText}\nMonto      : ${cup} CUP / ${usd} USD\nRegistrada : ${created}` +
             (edited ? `\nEditada    : ${edited}` : '') +
             `</pre>\n`;
     });
