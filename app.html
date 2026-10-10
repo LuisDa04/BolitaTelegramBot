@@ -2411,6 +2411,8 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
             ` : '';
 
             const turn = turnEmoji(bet.time_slot);
+            const singleItem = bet.items && bet.items.length === 1;
+            const itemsLabel = bet.bet_type === 'centena' ? (singleItem ? '💯 Centena jugada:' : '💯 Centenas jugadas:') : bet.bet_type === 'parle' ? (singleItem ? '🔗 Parlet jugado:' : '🔗 Parlets jugados:') : bet.bet_type === 'fijo' ? (singleItem ? '🎯 Número jugado:' : '🎯 Números jugados:') : bet.bet_type === 'corridos' ? (singleItem ? '🏃 Número jugado:' : '🏃 Números jugados:') : (singleItem ? '📝 Número jugado:' : '📝 Números jugados:');
 
             betDetailModalBody.innerHTML = `
                 <h4 class="text-xl font-bold mb-2">Detalles de la jugada</h4>
@@ -2418,7 +2420,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 <p class="text-xs text-gray-400 mb-3">${fmtCuba(toCubaTs(bet.placed_at), true)}${fueEditada(bet) ? `<span class="block mt-0.5 text-cyan-400/90">✏️ Editada: ${fmtCuba(toCubaTs(bet.updated_at), false)}</span>` : ''}</p>
                 
                 <div class="mb-3">
-                    <p class="font-semibold mb-1">${bet.bet_type === 'centena' ? '💯 Centenas jugadas:' : bet.bet_type === 'parle' ? '🔗 Parlets jugados:' : bet.bet_type === 'fijo' ? '🎯 Números jugados:' : bet.bet_type === 'corridos' ? '🏃 Números jugados:' : '📝 Números jugados:'}</p>
+                    <p class="font-semibold mb-1">${itemsLabel}</p>
                     ${itemsHtml}
                 </div>
                 
