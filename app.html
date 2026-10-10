@@ -1334,7 +1334,18 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 // frescos (este `userBets` local puede estar desactualizado).
                 const sinExceder = Object.keys(grouped).some(n => !cupExceeders.includes(n) && !usdExceeders.includes(n));
                 const aplicaAlgo = confirmable || sinExceder;
-                return { ok: false, error: `❌ ${label} ${joinListWithY(allNums)} ${verb} el monto máximo de apuesta permitido de ${maxParts.join(' y ')}.`, confirmable, aplicaAlgo };
+                // Cuando no queda nada aplicable, todos los números excedidos están
+                // ya en su tope: el aviso pasa a ser el de "ya fue apostado a su
+                // máximo permitido" en vez del genérico de "excede el monto máximo".
+                let error;
+                if (!aplicaAlgo) {
+                    const sentences = maxedSentences(betType, { cup: cupExceeders, usd: usdExceeders }, { maxCup, maxUsd });
+                    if (sentences.length > 0) error = `❌ ${sentences.join(' ')}`;
+                }
+                if (!error) {
+                    error = `❌ ${label} ${joinListWithY(allNums)} ${verb} el monto máximo de apuesta permitido de ${maxParts.join(' y ')}.`;
+                }
+                return { ok: false, error, confirmable, aplicaAlgo };
             }
             return { ok: true };
         }
@@ -1653,7 +1664,11 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     admissibleHtml = text;
                     isSingleOne = iso;
                 }
-                const question = isSingleOne ? '¿Deseas apostárselo?' : '¿Deseas apostárselos?';
+                // El pronombre concuerda con el sustantivo: "apostárselo(s)" para
+                // número/parlet y "apostársela(s)" para centena.
+                const question = isSingleOne
+                    ? (selectedBetType === 'centena' ? '¿Deseas apostársela?' : '¿Deseas apostárselo?')
+                    : (selectedBetType === 'centena' ? '¿Deseas apostárselas?' : '¿Deseas apostárselos?');
                 const admissibleLine = admissibleHtml ? `<br><br>${admissibleHtml}` : '';
                 textEl.innerHTML = `${errorText}${admissibleLine}<br>${question}`;
             }
@@ -5508,6 +5523,45 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 return `${first} y ${withArticles[1]}`;
             }
             return 'Los números, centenas y parlets';
+        }
+
+        // Frases del aviso de números ya apostados a su máximo, una por moneda
+        // (CUP primero, luego USD) y SIN emoji inicial. Espejo de backend.js.
+        function maxedSentences(betType, maxed, exceedData) {
+            const sentences = [];
+            const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : formatBetTypeLabel(betType).toLowerCase();
+            const nounPlural = typeNoun === 'número' ? 'números' : typeNoun === 'centena' ? 'centenas' : `${typeNoun}s`;
+
+            const sortNums = (nums) => [...nums].sort((a, b) => {
+                const na = parseInt(a, 10);
+                const nb = parseInt(b, 10);
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                return String(a).localeCompare(String(b));
+            });
+
+            const sentenceFor = (nums, max, currency) => {
+                const list = sortNums(nums);
+                if (list.length === 0) return null;
+                const isPlural = list.length > 1;
+                const subject = isPlural
+                    ? `${typeNoun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${joinListWithY(list)}`
+                    : `${typeNoun === 'centena' ? 'La' : 'El'} ${typeNoun} ${list[0]}`;
+                const verb = isPlural ? 'fueron' : 'fue';
+                const participle = isPlural
+                    ? `${typeNoun === 'centena' ? 'apostadas' : 'apostados'}`
+                    : `${typeNoun === 'centena' ? 'apostada' : 'apostado'}`;
+                return `${subject} ya ${verb} ${participle} a su máximo permitido de ${parseFloat(max).toFixed(2)} ${currency}.`;
+            };
+
+            if (exceedData?.maxCup !== null && exceedData?.maxCup !== undefined) {
+                const s = sentenceFor(maxed.cup, exceedData.maxCup, 'CUP');
+                if (s) sentences.push(s);
+            }
+            if (exceedData?.maxUsd !== null && exceedData?.maxUsd !== undefined) {
+                const s = sentenceFor(maxed.usd, exceedData.maxUsd, 'USD');
+                if (s) sentences.push(s);
+            }
+            return sentences;
         }
 
         // Añadir las funciones renderManageUsersView, searchUserByNameOrId y openBalanceModal
