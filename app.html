@@ -6460,8 +6460,22 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                             const rejCount = rejDep.length + rejWd.length;
                             const allRej = [...rejDep.map(d => ({ ...d, _type: 'Depósito' })), ...rejWd.map(w => ({ ...w, _type: 'Retiro' }))].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                             let bodyHtml = '';
+                            let rejTotalsHtml = '';
                             if (allRej.length === 0) bodyHtml = '<p class="text-gray-400">No tiene denegaciones.</p>';
                             else {
+                                let rejCUP = 0, rejUSD = 0;
+                                allRej.forEach(r => {
+                                    const amt = parseFloat(r.amount) || 0;
+                                    if (r.currency === 'USD') rejUSD += amt;
+                                    else if (r.currency === 'CUP') rejCUP += amt;
+                                    else {
+                                        const rate = r.currency === 'MLC' ? exchangeRates.rate_mlc
+                                                   : r.currency === 'USDT' ? exchangeRates.rate_usdt
+                                                   : r.currency === 'TRX' ? exchangeRates.rate_trx : 0;
+                                        rejCUP += amt * rate;
+                                    }
+                                });
+                                rejTotalsHtml = `<p class="text-xs text-gray-400 mt-1 whitespace-nowrap">Total denegado: ${rejCUP.toFixed(2)} CUP / ${rejUSD.toFixed(2)} USD</p>`;
                                 bodyHtml = '<div class="space-y-1">';
                                 allRej.forEach((r, i) => {
                                     const date = new Date(r.created_at).toLocaleString('es-CU', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
@@ -6482,7 +6496,10 @@ const date = new Date(b.placed_at).toLocaleString('es-CU', { day: 'numeric', mon
                                     <span class="text-red-400 font-semibold flex items-center"><i class="fas fa-ban mr-2"></i> Denegaciones (${rejCount})</span>
                                     <i class="fas fa-chevron-down text-gray-400 transition-transform"></i>
                                 </button>
-                                <div class="mt-2 max-h-96 overflow-y-auto${allRej.length === 0 ? ' hidden' : ''}">${bodyHtml}</div>
+                                <div class="mt-2${allRej.length === 0 ? ' hidden' : ''}">
+                                    <div class="max-h-96 overflow-y-auto">${bodyHtml}</div>
+                                    ${rejTotalsHtml}
+                                </div>
                             </div>`;
                         })()}
                     `;
