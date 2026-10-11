@@ -1781,18 +1781,21 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     // el aviso va en singular o plural (el número ya no se lista).
                     const omittedNums = Array.isArray(data.omittedNums) ? data.omittedNums.filter(n => n !== '' && n != null) : [];
                     let successMsg = '¡Buena suerte!';
+                    // Si la jugada quedó con omisiones, el toast pierde el 🍀 de
+                    // éxito: ya no es un "buena suerte" limpio.
+                    let hayOmision = false;
                     if (wasOmitted) {
-                        // Mismo texto que el bot (placeBetAndConfirm, rama omitted):
-                        // se refleja que la jugada se registró sin los números omitidos.
+                        // Texto pedido: voz activa, concordando verbo y sustantivo en
+                        // número y género. Se refleja que la jugada se registró sin
+                        // los números omitidos.
+                        hayOmision = true;
                         const singular = omittedNums.length === 1;
+                        // Minúscula porque el sustantivo va en medio de la frase.
                         const phrase = overLimitTypePhrase([selectedBetType], { singular })
-                            .replace(/^./, c => c.toUpperCase());
-                        const exceedVerb = singular ? 'excedía' : 'excedían';
-                        const omitVerb = singular
-                            ? (selectedBetType === 'centena' ? 'fue omitida' : 'fue omitido')
-                            : (selectedBetType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
-                        successMsg = `🚫 ${phrase} que ${exceedVerb} el monto máximo ${omitVerb}.`;
+                            .replace(/^./, c => c.toLowerCase());
+                        successMsg = `🚫 Se omiti${singular ? 'ó' : 'eron'} ${phrase} que ${singular ? 'excedía' : 'excedían'} el monto máximo permitido.`;
                     } else if (droppedMaxed.length > 0) {
+                        hayOmision = true;
                         const pluralDropped = droppedMaxed.length > 1;
                         // Un solo número: artículo y sustantivo en singular, con el
                         // mismo término que usa el backend ("número" solo para fijo y
@@ -1803,7 +1806,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         const prefijo = isEditing ? 'Se guardaron los cambios y' : 'Se registró la apuesta y';
                         successMsg = `${prefijo} se omitió${pluralDropped ? 'ron' : ''} ${pluralDropped ? overLimitPhrase : singularPhrase} ${joinListWithY(droppedMaxed)} por estar ya en su máximo.`;
                     }
-                    iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + ' 🍀' });
+                    iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + (hayOmision ? '' : ' 🍀') });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();
