@@ -1773,6 +1773,10 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     }
                     const wasOmitted = payload.omitLimitOverride === true;
                     const overLimitPhrase = overLimitTypePhrase([selectedBetType]).replace(/^./, c => c.toLowerCase());
+                    // Sustantivo con artículo y mayúscula inicial, igual que el bot
+                    // (placeBetAndConfirm capitaliza el comienzo de la frase).
+                    const capPhrase = (singular) => overLimitTypePhrase([selectedBetType], { singular })
+                        .replace(/^./, c => c.toUpperCase());
                     // Al confirmar el aviso de "ya al máximo", el servidor descarta
                     // esos números: decirlo explícito en vez de un "¡Buena suerte!" mudo.
                     const droppedMaxed = Array.isArray(data.droppedMaxedNums) ? data.droppedMaxedNums.filter(n => n !== '' && n != null) : [];
@@ -1780,20 +1784,24 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     // "No, omitir" en el modal clásico. Solo se usa para decidir si
                     // el aviso va en singular o plural (el número ya no se lista).
                     const omittedNums = Array.isArray(data.omittedNums) ? data.omittedNums.filter(n => n !== '' && n != null) : [];
+                    // Números recortados al máximo permitido (modal clásico "apostar
+                    // hasta el máximo"). Mismo aviso que el bot ("se ajustó al monto
+                    // permitido"); solo se usa para el singular/plural.
+                    const clampedNums = Array.isArray(data.clampedNums) ? data.clampedNums.filter(n => n !== '' && n != null) : [];
                     let successMsg = '¡Buena suerte!';
-                    // Si la jugada quedó con omisiones, el toast pierde el 🍀 de
-                    // éxito: ya no es un "buena suerte" limpio.
+                    // Si la jugada quedó con omisiones o recortes, el toast pierde el
+                    // 🍀 de éxito: ya no es un "buena suerte" limpio.
                     let hayOmision = false;
                     if (wasOmitted) {
-                        // Texto pedido: voz activa, concordando verbo y sustantivo en
-                        // número y género. Se refleja que la jugada se registró sin
-                        // los números omitidos.
+                        // Mismo texto que el bot (placeBetAndConfirm, rama omitted):
+                        // voz pasiva, concordando verbo y sustantivo en número y género.
                         hayOmision = true;
                         const singular = omittedNums.length === 1;
-                        // Minúscula porque el sustantivo va en medio de la frase.
-                        const phrase = overLimitTypePhrase([selectedBetType], { singular })
-                            .replace(/^./, c => c.toLowerCase());
-                        successMsg = `🚫 Se omiti${singular ? 'ó' : 'eron'} ${phrase} que ${singular ? 'excedía' : 'excedían'} el monto máximo permitido.`;
+                        const exceedVerb = singular ? 'excedía' : 'excedían';
+                        const omitVerb = singular
+                            ? (selectedBetType === 'centena' ? 'fue omitida' : 'fue omitido')
+                            : (selectedBetType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
+                        successMsg = `🚫 ${capPhrase(singular)} que ${exceedVerb} el monto máximo ${omitVerb}.`;
                     } else if (droppedMaxed.length > 0) {
                         hayOmision = true;
                         const pluralDropped = droppedMaxed.length > 1;
@@ -1805,6 +1813,14 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                         // la jugada se está creando ahora.
                         const prefijo = isEditing ? 'Se guardaron los cambios y' : 'Se registró la apuesta y';
                         successMsg = `${prefijo} se omitió${pluralDropped ? 'ron' : ''} ${pluralDropped ? overLimitPhrase : singularPhrase} ${joinListWithY(droppedMaxed)} por estar ya en su máximo.`;
+                    } else if (data.clamped && clampedNums.length > 0) {
+                        // Mismo aviso que el bot (placeBetAndConfirm, rama clamped): la
+                        // jugada se registró recortada al máximo permitido.
+                        hayOmision = true;
+                        const singular = clampedNums.length === 1;
+                        const exceedVerb = singular ? 'excedía' : 'excedían';
+                        const adjustVerb = singular ? 'se ajustó' : 'se ajustaron';
+                        successMsg = `ℹ️ ${capPhrase(singular)} que ${exceedVerb} el máximo ${adjustVerb} al monto permitido.`;
                     }
                     iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + (hayOmision ? '' : ' 🍀') });
                     currentUser = data.updatedUser;
