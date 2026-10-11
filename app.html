@@ -1777,18 +1777,21 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     // esos números: decirlo explícito en vez de un "¡Buena suerte!" mudo.
                     const droppedMaxed = Array.isArray(data.droppedMaxedNums) ? data.droppedMaxedNums.filter(n => n !== '' && n != null) : [];
                     // Igual que droppedMaxed, pero para lo que se omitió al elegir
-                    // "No, omitir" en el modal clásico. Sin esto había que asumir el
-                    // plural y se escribía "Se omitieron los números..." aunque
-                    // hubiera quedado fuera uno solo.
+                    // "No, omitir" en el modal clásico. Solo se usa para decidir si
+                    // el aviso va en singular o plural (el número ya no se lista).
                     const omittedNums = Array.isArray(data.omittedNums) ? data.omittedNums.filter(n => n !== '' && n != null) : [];
                     let successMsg = '¡Buena suerte!';
                     if (wasOmitted) {
-                        if (omittedNums.length === 1) {
-                            const singularPhrase = overLimitTypePhrase([selectedBetType], { singular: true });
-                            successMsg = `Se omitió ${singularPhrase} ${omittedNums[0]} por exceder el monto máximo permitido.`;
-                        } else {
-                            successMsg = `Se omitieron ${overLimitPhrase} que excedían el máximo permitido.`;
-                        }
+                        // Mismo texto que el bot (placeBetAndConfirm, rama omitted):
+                        // se refleja que la jugada se registró sin los números omitidos.
+                        const singular = omittedNums.length === 1;
+                        const phrase = overLimitTypePhrase([selectedBetType], { singular })
+                            .replace(/^./, c => c.toUpperCase());
+                        const exceedVerb = singular ? 'excedía' : 'excedían';
+                        const omitVerb = singular
+                            ? (selectedBetType === 'centena' ? 'fue omitida' : 'fue omitido')
+                            : (selectedBetType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
+                        successMsg = `🚫 ${phrase} que ${exceedVerb} el monto máximo ${omitVerb}.`;
                     } else if (droppedMaxed.length > 0) {
                         const pluralDropped = droppedMaxed.length > 1;
                         // Un solo número: artículo y sustantivo en singular, con el
