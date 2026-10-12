@@ -3113,9 +3113,12 @@ app.post('/api/bets', async (req, res) => {
                         }
                     } catch (e) {}
                 } else {
-                    // Sin migración, solo aviso genérico
+                    // Sin migración, solo aviso genérico. Si la comisión se acreditó
+                    // al bono (destination === 'bonus_cup'), hablamos de "bono";
+                    // si fue al saldo principal, se mantiene "saldo".
+                    const balanceWord = destination === 'bonus_cup' ? 'bono' : 'saldo';
                     try {
-                        const genericMsg = `ℹ️ Tu referido <b>${escapeHTML(bettorName)}</b> ha editado el monto de una apuesta. Tu saldo actual ha cambiado. Por favor, consulta.`;
+                        const genericMsg = `ℹ️ Tu referido <b>${escapeHTML(bettorName)}</b> ha editado el monto de una apuesta. Tu ${balanceWord} actual ha cambiado. Por favor, consulta.`;
                         if (bot && bot.telegram) {
                             await bot.telegram.sendMessage(newReferrerId, genericMsg, { parse_mode: 'HTML' });
                         } else {
