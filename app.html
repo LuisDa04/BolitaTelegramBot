@@ -2527,7 +2527,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                 
                 if (res.ok) {
                     const data = await res.json();
-                    iziToast.success({ message: 'Jugada cancelada y saldo reembolsado' });
+                    iziToast.success({ message: '❌ Jugada cancelada y saldo reembolsado.' });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();
