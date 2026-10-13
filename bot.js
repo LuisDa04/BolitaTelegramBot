@@ -2983,12 +2983,34 @@ function getAllowedHours(lotteryKey) {
     return schedules[lotteryKey];
 }
 
-// Última línea del aviso de horario. Para Georgia (solo esta lotería) se usa
-// un texto propio; el resto mantiene el original. Conserva el emoji inicial.
+// Indica si para Georgia ya estamos en la fase del turno Noche (la última
+// jugada del día) o pasada ella: la próxima oportunidad es mañana.
+function isGeorgiaNightPhase() {
+    const schedule = getAllowedHours('georgia');
+    const night = schedule?.slots?.find(s => s.name.includes('Noche'));
+    if (!night) return false;
+    const now = moment.tz(TIMEZONE);
+    return (now.hours() * 60 + now.minutes()) >= Math.round(night.start * 60);
+}
+
+// Última línea del aviso de horario no disponible. El texto "vuelve mañana" se
+// usa solo para el turno Noche de Georgia (solo esta lotería); el resto conserva
+// el original. Cubre el cierre automático (pasada la hora) y el manual. Mantiene
+// el emoji inicial.
 function scheduleUnavailableLastLine(lotteryKey) {
-    return lotteryKey === 'georgia'
+    return (lotteryKey === 'georgia' && isGeorgiaNightPhase())
         ? '🔄 Por favor, vuelve mañana dentro del horario permitido. ¡Te esperamos!'
         : '🔄 Por favor, intenta dentro del horario o elige otra lotería. ¡Te esperamos!';
+}
+
+// Última línea del aviso "no hay una sesión abierta", que aparece cuando la
+// sesión del turno está cerrada (p. ej. cierre manual del admin) dentro del
+// horario permitido. Para el turno Noche de Georgia también indica que vuelva
+// mañana; el resto conserva el texto original. Mantiene el emoji inicial.
+function noOpenSessionLastLine(lotteryKey) {
+    return (lotteryKey === 'georgia' && isGeorgiaNightPhase())
+        ? '🔄 Por favor, vuelve mañana dentro del horario permitido. ¡Te esperamos!'
+        : '🔄 Por favor, espera a que se abra una sesión o elige otra lotería. ¡Estamos contigo!';
 }
 
 // Aviso de "fuera de horario" para una lotería. Se usa tanto en el guardia de
@@ -3403,7 +3425,7 @@ bot.action(/lot_(.+)/, async (ctx) => {
             const errorMsg = 
                 `❌ <b>No hay una sesión abierta en este momento para ${schedule.emoji} ${schedule.name}</b>\n\n` +
                 `📅 Horarios de juego (hora de Cuba):\n${hoursText}\n` +
-                `🔄 Por favor, espera a que se abra una sesión o elige otra lotería. ¡Estamos contigo!`;
+                noOpenSessionLastLine(lotteryKey);
             await safeEdit(ctx, errorMsg, playLotteryKbd());
             return;
         }
