@@ -4967,11 +4967,15 @@ app.post('/api/admin/pending-deposits/:id/approve', requireAdmin, async (req, re
                 : `${request.amount} ${currencyNorm}`;
             const creditCurrency = currencyNorm === 'USD' ? 'USD' : 'CUP';
             const currencySymbol = creditCurrency === 'USD' ? '💵' : '🇨🇺';
+            // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
+            // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
+            // vez de "saldo CUP".
+            const destinationLabel = (currencyNorm !== 'CUP' && currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =
                 `✅ <b>Depósito aprobado</b>\n\n` +
                 `💰 Monto depositado: ${depositedAmountText}\n` +
-                `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditCurrency} a tu saldo ${creditCurrency}.\n`;
+                `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditCurrency} a tu saldo ${destinationLabel}.\n`;
 
             if (currencyNorm === 'USD') {
                 text += `ℹ️ Con tu saldo USD también puedes transferir en CUP; además retirar en CUP, USDT, TRX o MLC según los métodos disponibles.\n`;
@@ -6606,11 +6610,15 @@ app.post('/api/admin/pending-deposits-role/:id/approve', async (req, res) => {
                 : `${request.amount} ${currencyNorm}`;
             const creditCurrency = currencyNorm === 'USD' ? 'USD' : 'CUP';
             const currencySymbol = creditCurrency === 'USD' ? '💵' : '🇨🇺';
+            // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
+            // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
+            // vez de "saldo CUP".
+            const destinationLabel = (currencyNorm !== 'CUP' && currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =
                 `✅ <b>Depósito aprobado</b>\n\n` +
                 `💰 Monto depositado: ${depositedAmountText}\n` +
-                `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditCurrency} a tu saldo ${creditCurrency}.\n`;
+                `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditCurrency} a tu saldo ${destinationLabel}.\n`;
 
             if (currencyNorm === 'USD') {
                 text += `ℹ️ Con tu saldo USD también puedes transferir en CUP; además retirar en CUP, USDT, TRX o MLC según los métodos disponibles.\n`;
