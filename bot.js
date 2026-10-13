@@ -2983,6 +2983,14 @@ function getAllowedHours(lotteryKey) {
     return schedules[lotteryKey];
 }
 
+// Última línea del aviso de horario. Para Georgia (solo esta lotería) se usa
+// un texto propio; el resto mantiene el original. Conserva el emoji inicial.
+function scheduleUnavailableLastLine(lotteryKey) {
+    return lotteryKey === 'georgia'
+        ? '🔄 Por favor, vuelve mañana dentro del horario permitido. ¡Te esperamos!'
+        : '🔄 Por favor, intenta dentro del horario o elige otra lotería. ¡Te esperamos!';
+}
+
 // Aviso de "fuera de horario" para una lotería. Se usa tanto en el guardia de
 // horario del flujo de apuesta como al detectar una sesión ya cerrada, para que
 // el usuario reciba la misma redacción en ambos casos. Devuelve null si la
@@ -3000,7 +3008,7 @@ function buildScheduleUnavailableMessage(lotteryName) {
     }
     return `⏰ <b>Horario no disponible para ${schedule.emoji} ${schedule.name}</b>\n\n` +
         `📅 Los horarios permitidos (hora de Cuba) son:\n${hoursText}\n` +
-        `🔄 Por favor, intenta dentro del horario o elige otra lotería. ¡Te esperamos!`;
+        scheduleUnavailableLastLine(region.key);
 }
 
 // ========== MIDDLEWARE MEJORADO (AHORA PASA EL CONTEXTO A GETUSER) ==========
@@ -3364,7 +3372,7 @@ bot.action(/lot_(.+)/, async (ctx) => {
             const errorMsg = 
                 `⏰ <b>Horario no disponible para ${schedule.emoji} ${schedule.name}</b>\n\n` +
                 `📅 Los horarios permitidos (hora de Cuba) son:\n${hoursText}\n` +
-                `🔄 Por favor, intenta dentro del horario o elige otra lotería. ¡Te esperamos!`;
+                scheduleUnavailableLastLine(lotteryKey);
 
             await safeEdit(ctx, errorMsg, playLotteryKbd());
             return;
