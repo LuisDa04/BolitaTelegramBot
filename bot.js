@@ -6644,7 +6644,7 @@ bot.on(message('text'), async (ctx) => {
                                 {
                                     parse_mode: 'HTML',
                                     reply_markup: Markup.inlineKeyboard([
-                                        [Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`), Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`)]
+                                        [Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`), Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`)]
                                     ]).reply_markup
                                 }
                             );
@@ -6741,7 +6741,7 @@ bot.on(message('text'), async (ctx) => {
                                 {
                                     parse_mode: 'HTML',
                                     reply_markup: Markup.inlineKeyboard([
-                                        [Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`), Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`)]
+                                        [Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`), Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`)]
                                     ]).reply_markup
                                 }
                             );
@@ -6831,8 +6831,8 @@ bot.on(message('text'), async (ctx) => {
                                 {
                                     parse_mode: 'HTML',
                                     reply_markup: Markup.inlineKeyboard([
-                                        [Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`),
-                                         Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`)]
+                                        [Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`),
+                                         Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`)]
                                     ]).reply_markup
                                 }
                             );
@@ -7036,8 +7036,8 @@ bot.on(message('text'), async (ctx) => {
                         {
                             parse_mode: 'HTML',
                             reply_markup: Markup.inlineKeyboard([
-                                [Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`),
-                                 Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`)]
+                                [Markup.button.callback('❌ Rechazar', `reject_withdraw_${request.id}`),
+                                 Markup.button.callback('✅ Aprobar', `approve_withdraw_${request.id}`)]
                             ]).reply_markup
                         }
                     );
@@ -7686,8 +7686,8 @@ bot.on(message('photo'), async (ctx) => {
                             {
                                 parse_mode: 'HTML',
                                 reply_markup: Markup.inlineKeyboard([
-                                    [Markup.button.callback('✅ Aprobar', `approve_deposit_${request.id}`),
-                                     Markup.button.callback('❌ Rechazar', `reject_deposit_${request.id}`)]
+                                    [Markup.button.callback('❌ Rechazar', `reject_deposit_${request.id}`),
+                                     Markup.button.callback('✅ Aprobar', `approve_deposit_${request.id}`)]
                                 ]).reply_markup
                             }
                         );

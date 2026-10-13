@@ -2211,8 +2211,8 @@ app.post('/api/deposit-requests', upload.single('screenshot'), async (req, res) 
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[
-                        { text: '✅ Aprobar', callback_data: `approve_deposit_${request.id}` },
-                        { text: '❌ Rechazar', callback_data: `reject_deposit_${request.id}` }
+                        { text: '❌ Rechazar', callback_data: `reject_deposit_${request.id}` },
+                        { text: '✅ Aprobar', callback_data: `approve_deposit_${request.id}` }
                     ]]
                 }
             });
@@ -2360,8 +2360,8 @@ app.post('/api/withdraw-requests', async (req, res) => {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[
-                        { text: '✅ Aprobar', callback_data: `approve_withdraw_${request.id}` },
-                        { text: '❌ Rechazar', callback_data: `reject_withdraw_${request.id}` }
+                        { text: '❌ Rechazar', callback_data: `reject_withdraw_${request.id}` },
+                        { text: '✅ Aprobar', callback_data: `approve_withdraw_${request.id}` }
                     ]]
                 }
             });
