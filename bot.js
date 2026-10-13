@@ -561,12 +561,16 @@ async function buildLastBetsText(bets) {
     return text;
 }
 
-function buildDepositApprovedMessage({ depositedAmountText, creditedAmount, creditedCurrency, includeUsdFollowup = false, bonusMovedCup = 0, showBonusMovedNotice = false }) {
+function buildDepositApprovedMessage({ depositedAmountText, creditedAmount, creditedCurrency, isPrincipal = false, includeUsdFollowup = false, bonusMovedCup = 0, showBonusMovedNotice = false }) {
     const currencySymbol = creditedCurrency === 'CUP' ? '🇨🇺' : '💵';
+    // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto se
+    // sigue acreditando en CUP, pero el texto dice "saldo principal" en vez de
+    // "saldo CUP".
+    const destinationLabel = isPrincipal ? 'principal' : creditedCurrency;
     let text =
         `✅ <b>Depósito aprobado</b>\n\n` +
         `💰 Monto depositado: ${depositedAmountText}\n` +
-        `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditedCurrency} a tu saldo ${creditedCurrency}.\n`;
+        `${currencySymbol} ${Math.round(creditedAmount * 100) / 100 === 1.00 ? 'Se acreditó' : 'Se acreditaron'} ${creditedAmount.toFixed(2)} ${creditedCurrency} a tu saldo ${destinationLabel}.\n`;
 
     if (includeUsdFollowup) {
         text += `ℹ️ Con tu saldo USD también puedes transferir en CUP; además retirar en CUP, USDT, TRX o MLC según los métodos disponibles.\n`;
@@ -7691,7 +7695,9 @@ bot.on(message('photo'), async (ctx) => {
                     } catch (e) {}
                 }
                 if (depEntries.length > 0 && bot.pendingNotifications) bot.pendingNotifications.set(depKey, depEntries);
-                await ctx.reply(`✅ <b>Solicitud de depósito enviada</b>\n💰 Monto: ${escapeHTML(amountText)}\n⏳ Tu solicitud está siendo procesada. Te notificaremos cuando se acredite.\n\n\n¡Gracias por confiar en nosotros!`, { parse_mode: 'HTML' });
+                // Mostrar la moneda en mayúsculas (ej: "1 mlc" -> "1 MLC") sin alterar el número.
+                const amountDisplay = String(amountText).replace(/[a-zA-Z]+/g, (m) => m.toUpperCase());
+                await ctx.reply(`✅ <b>Solicitud de depósito enviada</b>\n💰 Monto: ${escapeHTML(amountDisplay)}\n⏳ Tu solicitud está siendo procesada. Te notificaremos cuando se acredite.\n\n\n¡Gracias por confiar en nosotros!`, { parse_mode: 'HTML' });
             } catch (e) {
                 console.error(e);
                 await ctx.reply('❌ Error al procesar la solicitud. Por favor, intenta más tarde o contacta a soporte.', getMainKeyboard(ctx));
@@ -7822,6 +7828,7 @@ bot.action(/approve_deposit_(\d+)/, async (ctx) => {
                         depositedAmountText: `${request.amount} ${request.currency}`,
                         creditedAmount: depositCurrency === 'USD' ? depositAmount : amountCUP,
                         creditedCurrency: depositCurrency === 'USD' ? 'USD' : 'CUP',
+                        isPrincipal: depositCurrency !== 'CUP' && depositCurrency !== 'USD',
                         includeUsdFollowup: depositCurrency === 'USD',
                         bonusMovedCup,
                         showBonusMovedNotice: isFirstDeposit && (parseFloat(user.bonus_cup) || 0) > 0
