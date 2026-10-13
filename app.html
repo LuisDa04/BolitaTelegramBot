@@ -1789,13 +1789,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     // permitido"); solo se usa para el singular/plural.
                     const clampedNums = Array.isArray(data.clampedNums) ? data.clampedNums.filter(n => n !== '' && n != null) : [];
                     let successMsg = '¡Buena suerte!';
-                    // Si la jugada quedó con omisiones o recortes, el toast pierde el
-                    // 🍀 de éxito: ya no es un "buena suerte" limpio.
-                    let hayOmision = false;
                     if (wasOmitted) {
                         // Mismo texto que el bot (placeBetAndConfirm, rama omitted):
                         // voz pasiva, concordando verbo y sustantivo en número y género.
-                        hayOmision = true;
                         const singular = omittedNums.length === 1;
                         const exceedVerb = singular ? 'excedía' : 'excedían';
                         const omitVerb = singular
@@ -1803,7 +1799,6 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                             : (selectedBetType === 'centena' ? 'fueron omitidas' : 'fueron omitidos');
                         successMsg = `🚫 ${capPhrase(singular)} que ${exceedVerb} el monto máximo ${omitVerb}.`;
                     } else if (droppedMaxed.length > 0) {
-                        hayOmision = true;
                         const pluralDropped = droppedMaxed.length > 1;
                         // Un solo número: artículo y sustantivo en singular, con el
                         // mismo término que usa el backend ("número" solo para fijo y
@@ -1816,13 +1811,12 @@ Varios por línea: 17x32 17x62 32x62 con 3 cup<br>`;
                     } else if (data.clamped && clampedNums.length > 0) {
                         // Mismo aviso que el bot (placeBetAndConfirm, rama clamped): la
                         // jugada se registró recortada al máximo permitido.
-                        hayOmision = true;
                         const singular = clampedNums.length === 1;
                         const exceedVerb = singular ? 'excedía' : 'excedían';
                         const adjustVerb = singular ? 'se ajustó' : 'se ajustaron';
                         successMsg = `ℹ️ ${capPhrase(singular)} que ${exceedVerb} el máximo ${adjustVerb} al monto permitido.`;
                     }
-                    iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + (hayOmision ? '' : ' 🍀') });
+                    iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + ' 🍀' });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();
