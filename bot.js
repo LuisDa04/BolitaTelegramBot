@@ -7906,7 +7906,7 @@ bot.action(/reject_deposit_(\d+)/, async (ctx) => {
                     { parse_mode: 'HTML' }
                 );
             } catch (e) {}
-            updatePendingNotifications(`deposit_${requestId}`, `❌ <b>Depósito #${requestId} rechazado</b> por un administrador.`);
+            updatePendingNotifications(`deposit_${requestId}`, `❌ <b>Depósito #${requestId} rechazado</b> por un administrador.`, ctx.from.id);
         })();
     } catch (e) {
         console.error(e);
@@ -8004,7 +8004,7 @@ bot.action(/reject_withdraw_(\d+)/, async (ctx) => {
             `❌ <b>Retiro rechazado</b>\n\n💰 Monto: ${parseFloat(request.amount)} ${String(request.currency || '').toUpperCase()}\n📌 Tu solicitud no pudo ser procesada. Si crees que esto es incorrecto, por favor, contáctanos para más información.`,
             { parse_mode: 'HTML' }
         ).catch(() => {});
-        updatePendingNotifications(`withdraw_${requestId}`, `❌ <b>Retiro #${requestId} rechazado</b> por un administrador.`);
+        updatePendingNotifications(`withdraw_${requestId}`, `❌ <b>Retiro #${requestId} rechazado</b> por un administrador.`, ctx.from.id);
         ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
         await ctx.reply('❌ Retiro rechazado.');
         await ctx.answerCbQuery();
@@ -8420,10 +8420,13 @@ bot.on('edited_message', async (ctx) => {
 });
 
 // ========== ACTUALIZAR NOTIFICACIONES PENDIENTES (reflejar decisión web ↔ bot) ==========
-async function updatePendingNotifications(key, statusText) {
+// `excludeChatId`: si se indica, no se edita la notificación de ese admin
+// (p. ej. el que acaba de ejecutar la acción, para que no le llegue el aviso).
+async function updatePendingNotifications(key, statusText, excludeChatId) {
     const entries = bot.pendingNotifications?.get(key);
     if (!entries) return;
     for (const { chatId, messageId } of entries) {
+        if (excludeChatId != null && Number(chatId) === Number(excludeChatId)) continue;
         try {
             await bot.telegram.editMessageText(chatId, messageId, undefined, statusText, {
                 parse_mode: 'HTML',
