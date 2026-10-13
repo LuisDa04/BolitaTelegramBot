@@ -1552,14 +1552,22 @@ async function getUser(telegramId, firstName = '', username = null, ctx = null) 
 
         if (user) {
             const updates = {};
-            if (username && user.username !== username) {
-                updates.username = username;
+            // Sincroniza el @username en AMBOS sentidos: si el usuario cambia su @
+            // se guarda el nuevo, y si lo elimina en Telegram se limpia en la BD.
+            // Antes la condición exigía un username entrante (username && ...), así
+            // que al quitarse el @ se quedaba el valor viejo para siempre y todos
+            // los paneles seguían mostrando ese @. Ahora los sitios que caen al ID
+            // cuando no hay @ pasan a mostrar el ID real.
+            if ((user.username || null) !== (username || null)) {
+                updates.username = username || null;
             }
             if (firstName && user.first_name !== firstName) {
                 updates.first_name = firstName;
             }
             if (Object.keys(updates).length > 0) {
                 await supabase.from('users').update(updates).eq('telegram_id', telegramId);
+                // Reflejar el cambio en el objeto devuelto para esta misma request.
+                Object.assign(user, updates);
             }
             // Migrar bono a saldo principal solo si el usuario ya tuvo depósito aprobado
             try {

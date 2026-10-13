@@ -762,7 +762,7 @@ async function buildRealBalanceDebitPlan(user, amount, currency, rateUSDOverride
 }
 
 // ========== FUNCIÓN GETORCREATEUSER CON MANEJO DE ERROR DE COLUMNA ==========
-async function getOrCreateUser(telegramId, firstName = '', username = null) {
+async function getOrCreateUser(telegramId, firstName = '', username = null, syncUsername = false) {
     try {
         let isNewUser = false;
         let { data: user, error: selectError } = await supabase
@@ -829,7 +829,18 @@ async function getOrCreateUser(telegramId, firstName = '', username = null) {
             }
         } else {
             const updates = {};
-            if (username && user.username !== username) {
+            // Sincroniza el @username SOLO cuando la fuente es autoritativa
+            // (syncUsername = true, p. ej. /api/auth con el initData de Telegram).
+            // Sin ese flag, los endpoints que llaman getOrCreateUser(id) sin
+            // username (depósitos, apuestas, transferencias...) borrarían el @.
+            //  - Autoritativo: sincroniza en AMBOS sentidos (cambio y eliminación).
+            //  - No autoritativo: comportamiento viejo, solo actualiza si llega un @.
+            if (syncUsername) {
+                const incoming = (typeof username === 'string' && username.trim() !== '') ? username : null;
+                if ((user.username || null) !== incoming) {
+                    updates.username = incoming;
+                }
+            } else if (username && user.username !== username) {
                 updates.username = username;
             }
             if (firstName && user.first_name !== firstName) {
@@ -841,6 +852,8 @@ async function getOrCreateUser(telegramId, firstName = '', username = null) {
                         .from('users')
                         .update(updates)
                         .eq('telegram_id', telegramId);
+                    // Reflejar el cambio en el objeto devuelto para esta misma request.
+                    Object.assign(user, updates);
                 } catch (e) {
                     console.error('Error actualizando perfil:', e);
                 }
@@ -1945,7 +1958,7 @@ app.post('/api/auth', async (req, res) => {
         console.error('Error verificando deleted_users en /api/auth:', e);
     }
 
-    const user = await getOrCreateUser(tgUser.id, tgUser.first_name, tgUser.username);
+    const user = await getOrCreateUser(tgUser.id, tgUser.first_name, tgUser.username, true);
     if (user && user.is_banned) {
         return res.status(403).json({ error: 'Tu cuenta ha sido baneada.' });
     }
