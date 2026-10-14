@@ -7866,7 +7866,7 @@ bot.action(/approve_deposit_(\d+)/, async (ctx) => {
                     { parse_mode: 'HTML' }
                 );
             } catch (e) {}
-            updatePendingNotifications(`deposit_${requestId}`, `✅ <b>Depósito #${requestId} aprobado</b> por un administrador.`);
+            updatePendingNotifications(`deposit_${requestId}`, `✅ <b>Depósito #${requestId} aprobado</b> por un administrador.`, ctx.from.id);
         })();
     } catch (e) {
         console.error(e);
@@ -7970,7 +7970,7 @@ bot.action(/approve_withdraw_(\d+)/, async (ctx) => {
             { parse_mode: 'HTML' }
         );
 
-        updatePendingNotifications(`withdraw_${requestId}`, `✅ <b>Retiro #${requestId} aprobado</b> por un administrador.`);
+        updatePendingNotifications(`withdraw_${requestId}`, `✅ <b>Retiro #${requestId} aprobado</b> por un administrador.`, ctx.from.id);
         try {
             await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
             await ctx.reply('✅ Retiro aprobado y saldo debitado correctamente.');
