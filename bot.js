@@ -3696,7 +3696,8 @@ bot.action('bet_maxed_abort', async (ctx) => {
     try {
         await ctx.answerCbQuery().catch(() => {});
         if (ctx.session) ctx.session.pendingMaxedOverride = null;
-        await safeEdit(ctx, '❌ Tu apuesta no se registró.', getMainKeyboard(ctx));
+        try { await ctx.deleteMessage(); } catch (e) {}
+        await ctx.reply('❌ Tu apuesta no se registró.', getMainKeyboard(ctx)).catch(() => {});
     } catch (e) {
         console.error('Error en bet_maxed_abort:', e);
         await ctx.reply('❌ Tu apuesta no se registró.', getMainKeyboard(ctx)).catch(() => {});
