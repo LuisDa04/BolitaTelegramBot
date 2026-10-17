@@ -2488,12 +2488,12 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
     // Al omitir/recortar números excedidos se muestran solo las jugadas que
     // quedaron, para que la confirmación coincida con lo realmente registrado.
     let shownJugadas = rawText;
-    let confirmMsg = `✅ <b>Jugada registrada</b>\n\n` +
+    let confirmMsg = `✅ <b>Jugada registrada</b> 🍀\n\n` +
         `🎰 Lotería: ${escapeHTML(session?.lottery || 'N/D')}\n` +
         `🔢 Tipo: ${escapeHTML(formatBetTypeLabel(betType))}\n` +
         `📋 Jugadas:\n<code>${escapeHTML(shownJugadas)}</code>\n` +
         `💰 Costo: ${totalCUP.toFixed(2)} CUP / ${totalUSD.toFixed(2)} USD\n\n` +
-        `¡Buena suerte! 🍀`;
+        `¡Buena suerte!`;
     if (typeof bonusUsed !== 'undefined' && bonusUsed > 0) {
         const remainingBonus = bonusBalance - bonusUsed;
         const esUnSoloCup = Math.abs(bonusUsed - 1) < 1e-6;

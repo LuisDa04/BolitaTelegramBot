@@ -1816,7 +1816,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                         const adjustVerb = singular ? 'se ajustó' : 'se ajustaron';
                         successMsg = `ℹ️ ${capPhrase(singular)} que ${exceedVerb} el máximo ${adjustVerb} al monto permitido.`;
                     }
-                    iziToast.success({ title: isEditing ? '✅ Jugada editada' : '✅ Jugada registrada', message: successMsg + ' 🍀' });
+                    iziToast.success({ title: isEditing ? '✅ Jugada editada 🍀' : '✅ Jugada registrada 🍀', message: successMsg });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();
