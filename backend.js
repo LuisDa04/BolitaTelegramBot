@@ -4967,9 +4967,9 @@ app.post('/api/admin/pending-deposits/:id/approve', requireAdmin, async (req, re
                 : `${request.amount} ${currencyNorm}`;
             const creditCurrency = currencyNorm === 'USD' ? 'USD' : 'CUP';
             const currencySymbol = creditCurrency === 'USD' ? '💵' : '🇨🇺';
-            // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
-            // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
-            // vez de "saldo CUP".
+            // Cualquier depósito que no sea en USD (CUP, USDT, TRX, MLC): el monto
+            // se acredita en CUP, pero el texto dice "saldo principal" en vez de
+            // "saldo CUP".
             const destinationLabel = (currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =
@@ -6610,9 +6610,9 @@ app.post('/api/admin/pending-deposits-role/:id/approve', async (req, res) => {
                 : `${request.amount} ${currencyNorm}`;
             const creditCurrency = currencyNorm === 'USD' ? 'USD' : 'CUP';
             const currencySymbol = creditCurrency === 'USD' ? '💵' : '🇨🇺';
-            // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
-            // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
-            // vez de "saldo CUP".
+            // Cualquier depósito que no sea en USD (CUP, USDT, TRX, MLC): el monto
+            // se acredita en CUP, pero el texto dice "saldo principal" en vez de
+            // "saldo CUP".
             const destinationLabel = (currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =

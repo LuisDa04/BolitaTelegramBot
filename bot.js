@@ -563,9 +563,8 @@ async function buildLastBetsText(bets) {
 
 function buildDepositApprovedMessage({ depositedAmountText, creditedAmount, creditedCurrency, isPrincipal = false, includeUsdFollowup = false, bonusMovedCup = 0, showBonusMovedNotice = false }) {
     const currencySymbol = creditedCurrency === 'CUP' ? '🇨🇺' : '💵';
-    // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto se
-    // sigue acreditando en CUP, pero el texto dice "saldo principal" en vez de
-    // "saldo CUP".
+    // Cualquier depósito que no sea en USD (CUP, USDT, TRX, MLC): el monto se
+    // acredita en CUP, pero el texto dice "saldo principal" en vez de "saldo CUP".
     const destinationLabel = isPrincipal ? 'principal' : creditedCurrency;
     let text =
         `✅ <b>Depósito aprobado</b>\n\n` +
@@ -7888,7 +7887,7 @@ bot.action(/approve_deposit_(\d+)/, async (ctx) => {
                         depositedAmountText: `${request.amount} ${String(request.currency || '').toUpperCase()}`,
                         creditedAmount: depositCurrency === 'USD' ? depositAmount : amountCUP,
                         creditedCurrency: depositCurrency === 'USD' ? 'USD' : 'CUP',
-                        isPrincipal: depositCurrency !== 'CUP' && depositCurrency !== 'USD',
+                        isPrincipal: depositCurrency !== 'USD',
                         includeUsdFollowup: depositCurrency === 'USD',
                         bonusMovedCup,
                         showBonusMovedNotice: isFirstDeposit && (parseFloat(user.bonus_cup) || 0) > 0
