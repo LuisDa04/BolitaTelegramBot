@@ -5165,8 +5165,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                 } else {
                     const depCounts = {};
                     for (const d of data.deposits) depCounts[d.currency] = (depCounts[d.currency] || 0) + 1;
-                    html += `<div class="flex flex-wrap gap-1 mb-3">
-                        <button class="filter-btn active bg-emerald-600 px-3 py-1 rounded-full text-sm" data-section="deposits" data-filter="all" data-count="${data.deposits.length}" onclick="filterCurrency('deposits','all')">Todos (${data.deposits.length})</button>`;
+                    html += `<div class="flex flex-wrap gap-1 mb-3">`;
                     for (const cur of allCurrencies) {
                         const cnt = depCounts[cur] || 0;
                         html += `<button class="filter-btn ${curColor(cur)} px-3 py-1 rounded-full text-sm" data-section="deposits" data-filter="${cur}" data-count="${cnt}" onclick="filterCurrency('deposits','${cur}')">${cur} (${cnt})</button>`;
@@ -5203,8 +5202,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                 } else {
                     const wdCounts = {};
                     for (const w of data.withdrawals) wdCounts[w.currency] = (wdCounts[w.currency] || 0) + 1;
-                    html += `<div class="flex flex-wrap gap-1 mb-3">
-                        <button class="filter-btn active bg-emerald-600 px-3 py-1 rounded-full text-sm" data-section="withdrawals" data-filter="all" data-count="${data.withdrawals.length}" onclick="filterCurrency('withdrawals','all')">Todos (${data.withdrawals.length})</button>`;
+                    html += `<div class="flex flex-wrap gap-1 mb-3">`;
                     for (const cur of allCurrencies) {
                         const cnt = wdCounts[cur] || 0;
                         html += `<button class="filter-btn ${curColor(cur)} px-3 py-1 rounded-full text-sm" data-section="withdrawals" data-filter="${cur}" data-count="${cnt}" onclick="filterCurrency('withdrawals','${cur}')">${cur} (${cnt})</button>`;
@@ -5248,8 +5246,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                 } else {
                     const rejCounts = {};
                     for (const r of rej) rejCounts[r.currency] = (rejCounts[r.currency] || 0) + 1;
-                    html += `<div class="flex flex-wrap gap-1 mb-3">
-                        <button class="filter-btn active bg-emerald-600 px-3 py-1 rounded-full text-sm" data-section="rejections" data-filter="all" data-count="${rej.length}" onclick="filterCurrency('rejections','all')">Todos (${rej.length})</button>`;
+                    html += `<div class="flex flex-wrap gap-1 mb-3">`;
                     for (const cur of allCurrencies) {
                         const cnt = rejCounts[cur] || 0;
                         html += `<button class="filter-btn ${curColor(cur)} px-3 py-1 rounded-full text-sm" data-section="rejections" data-filter="${cur}" data-count="${cnt}" onclick="filterCurrency('rejections','${cur}')">${cur} (${cnt})</button>`;
@@ -5356,6 +5353,9 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
 
         window.filterCurrency = (section, currency) => {
             const curColor = c => c === 'CUP' ? 'bg-green-600' : c === 'USD' ? 'bg-yellow-600' : c === 'USDT' ? 'bg-orange-600' : c === 'TRX' ? 'bg-red-600' : c === 'MLC' ? 'bg-purple-600' : '';
+            // Sin botón "Todos": volver a pulsar la moneda activa la deselecciona y muestra todo
+            const activeBtn = document.querySelector(`[data-section="${section}"].filter-btn.active`);
+            if (activeBtn && activeBtn.dataset.filter === currency) currency = 'all';
             document.querySelectorAll(`[data-section="${section}"]`).forEach(b => {
                 b.classList.remove('active', 'bg-emerald-600');
                 const f = b.dataset.filter;
@@ -5366,8 +5366,7 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
             });
             document.querySelectorAll(`[data-section="${section}"]`).forEach(b => {
                 const f = b.dataset.filter;
-                if (f === 'all') b.textContent = `Todos (${b.dataset.count || 0})`;
-                else b.textContent = `${f} (${b.dataset.count || 0})`;
+                if (f && f !== 'all') b.textContent = `${f} (${b.dataset.count || 0})`;
             });
             const clicked = document.querySelector(`[data-section="${section}"][data-filter="${currency}"]`);
             if (clicked) {
