@@ -2983,32 +2983,61 @@ function getAllowedHours(lotteryKey) {
     return schedules[lotteryKey];
 }
 
+// Hora actual de Cuba en minutos desde medianoche.
+function cubaNowMinutes() {
+    const now = moment.tz(TIMEZONE);
+    return now.hours() * 60 + now.minutes();
+}
+
 // Indica si para Georgia ya estamos en la fase del turno Noche (la última
 // jugada del día) o pasada ella: la próxima oportunidad es mañana.
 function isGeorgiaNightPhase() {
     const schedule = getAllowedHours('georgia');
     const night = schedule?.slots?.find(s => s.name.includes('Noche'));
     if (!night) return false;
-    const now = moment.tz(TIMEZONE);
-    return (now.hours() * 60 + now.minutes()) >= Math.round(night.start * 60);
+    return cubaNowMinutes() >= Math.round(night.start * 60);
+}
+
+// Indica si ya cerró la última lotería del día (hoy: Georgia Noche, 11:15 p. m.
+// de Cuba). A partir de ahí ninguna lotería admite jugadas hasta mañana, así que
+// "elige otra lotería" deja de tener sentido para cualquiera de ellas.
+function isAfterLastClose() {
+    let lastEnd = null;
+    for (const key of ['florida', 'georgia', 'newyork']) {
+        const schedule = getAllowedHours(key);
+        for (const slot of schedule?.slots || []) {
+            if (lastEnd === null || slot.end > lastEnd) lastEnd = slot.end;
+        }
+    }
+    if (lastEnd === null) return false;
+    return cubaNowMinutes() >= Math.round(lastEnd * 60);
+}
+
+// ¿El aviso debe invitar a volver mañana? Sí en el turno Noche de Georgia (la
+// última jugada del día de esa lotería) y, en general, pasada la última hora de
+// cierre del día (11:15 p. m. de Cuba): en ese momento ya no queda ninguna
+// lotería disponible hasta mañana.
+function shouldComeBackTomorrow(lotteryKey) {
+    return (lotteryKey === 'georgia' && isGeorgiaNightPhase()) || isAfterLastClose();
 }
 
 // Última línea del aviso de horario no disponible. El texto "vuelve mañana" se
-// usa solo para el turno Noche de Georgia (solo esta lotería); el resto conserva
-// el original. Cubre el cierre automático (pasada la hora) y el manual. Mantiene
-// el emoji inicial.
+// usa para el turno Noche de Georgia y para cualquier lotería pasada la última
+// hora de cierre del día; el resto conserva el original. Cubre el cierre
+// automático (pasada la hora) y el manual. Mantiene el emoji inicial.
 function scheduleUnavailableLastLine(lotteryKey) {
-    return (lotteryKey === 'georgia' && isGeorgiaNightPhase())
+    return shouldComeBackTomorrow(lotteryKey)
         ? '🔄 Por favor, vuelve mañana dentro del horario permitido. ¡Te esperamos!'
         : '🔄 Por favor, intenta dentro del horario o elige otra lotería. ¡Te esperamos!';
 }
 
 // Última línea del aviso "no hay una sesión abierta", que aparece cuando la
 // sesión del turno está cerrada (p. ej. cierre manual del admin) dentro del
-// horario permitido. Para el turno Noche de Georgia también indica que vuelva
-// mañana; el resto conserva el texto original. Mantiene el emoji inicial.
+// horario permitido. Para el turno Noche de Georgia —y pasada la última hora de
+// cierre— también indica que vuelva mañana; el resto conserva el texto original.
+// Mantiene el emoji inicial.
 function noOpenSessionLastLine(lotteryKey) {
-    return (lotteryKey === 'georgia' && isGeorgiaNightPhase())
+    return shouldComeBackTomorrow(lotteryKey)
         ? '🔄 Por favor, vuelve mañana dentro del horario permitido. ¡Te esperamos!'
         : '🔄 Por favor, espera a que se abra una sesión o elige otra lotería. ¡Estamos contigo!';
 }
