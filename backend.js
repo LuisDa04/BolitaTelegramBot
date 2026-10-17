@@ -1624,7 +1624,7 @@ function maxedNoticeText(betType, maxed, exceedData, { esEdicion = true } = {}) 
     const pregunta = esEdicion
         ? '¿Deseas continuar con la edición?'
         : '¿Deseas continuar con la apuesta?';
-    return `${sentences.map(s => `⚠️ ${s}`).join(' ')}\n${pregunta}`;
+    return `${sentences.map(s => `⚠️ ${s}`).join(' ')}\n\n${pregunta}`;
 }
 
 // Aviso que NO pregunta: se usa cuando la edición no tiene nada que aplicar
