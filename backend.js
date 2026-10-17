@@ -1760,7 +1760,7 @@ function serializeItemsToText(items, betType) {
             byAmount[a].push(String(it.numero));
         }
         for (const a of Object.keys(byAmount).sort((x, y) => parseFloat(x) - parseFloat(y))) {
-            lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} cup`);
+            lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} CUP`);
         }
     }
     if (usdItems.length > 0) {
@@ -1771,7 +1771,7 @@ function serializeItemsToText(items, betType) {
             byAmount[a].push(String(it.numero));
         }
         for (const a of Object.keys(byAmount).sort((x, y) => parseFloat(x) - parseFloat(y))) {
-            lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} usd`);
+            lines.push(`${byAmount[a].join(' ')} con ${fmtAmount(parseFloat(a))} USD`);
         }
     }
     return lines.join('\n');
@@ -2209,7 +2209,7 @@ app.post('/api/deposit-requests', upload.single('screenshot'), async (req, res) 
         try {
             const sentMsg = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 chat_id: adminId,
-                text: `📥 <b>Nueva solicitud de DEPÓSITO</b> (WebApp)\n👤 Usuario: ${escapeHTML(user.first_name || 'Usuario')} (${userTagLink(user.username, userId)})\n🏦 Método: ${method.name} (${currency})\n💰 Monto: ${amount}\n📎 <a href="${publicUrl}">Ver captura</a>\n🆔 Solicitud: ${request.id}`,
+                text: `📥 <b>Nueva solicitud de DEPÓSITO</b> (WebApp)\n👤 Usuario: ${escapeHTML(user.first_name || 'Usuario')} (${userTagLink(user.username, userId)})\n🏦 Método: ${method.name} (${String(currency).toUpperCase()})\n💰 Monto: ${String(amount).replace(/[a-zA-Z]+/g, (m) => m.toUpperCase())}\n📎 <a href="${publicUrl}">Ver captura</a>\n🆔 Solicitud: ${request.id}`,
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[
@@ -2358,7 +2358,7 @@ app.post('/api/withdraw-requests', async (req, res) => {
             const accountEmoji = currency === 'USDT' || currency === 'TRX' ? '👝' : { CUP: '🇨🇺', USD: '💵', MLC: '🏦', USDT: '🪙', TRX: '🪙' }[currency] || '💳';
             const sentMsg = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 chat_id: adminId,
-                text: `📤 <b>Nueva solicitud de RETIRO</b> (WebApp)\n👤 Usuario: ${escapeHTML(user.first_name || 'Usuario')} (${userTagLink(user.username, userId)})\n💰 Monto: ${amount} ${currency}\n🏦 Método: ${method.name} (${currency})\n${accountEmoji} ${accountInfo}\n🆔 Solicitud: ${request.id}`,
+                text: `📤 <b>Nueva solicitud de RETIRO</b> (WebApp)\n👤 Usuario: ${escapeHTML(user.first_name || 'Usuario')} (${userTagLink(user.username, userId)})\n💰 Monto: ${amount} ${String(currency).toUpperCase()}\n🏦 Método: ${method.name} (${String(currency).toUpperCase()})\n${accountEmoji} ${accountInfo}\n🆔 Solicitud: ${request.id}`,
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[
@@ -4972,7 +4972,7 @@ app.post('/api/admin/pending-deposits/:id/approve', requireAdmin, async (req, re
             // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
             // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
             // vez de "saldo CUP".
-            const destinationLabel = (currencyNorm !== 'CUP' && currencyNorm !== 'USD') ? 'principal' : creditCurrency;
+            const destinationLabel = (currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =
                 `✅ <b>Depósito aprobado</b>\n\n` +
@@ -6615,7 +6615,7 @@ app.post('/api/admin/pending-deposits-role/:id/approve', async (req, res) => {
             // Depósitos en una moneda distinta de CUP/USD (USDT, TRX, MLC): el monto
             // se sigue acreditando en CUP, pero el texto dice "saldo principal" en
             // vez de "saldo CUP".
-            const destinationLabel = (currencyNorm !== 'CUP' && currencyNorm !== 'USD') ? 'principal' : creditCurrency;
+            const destinationLabel = (currencyNorm !== 'USD') ? 'principal' : creditCurrency;
 
             let text =
                 `✅ <b>Depósito aprobado</b>\n\n` +
