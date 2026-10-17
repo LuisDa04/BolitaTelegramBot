@@ -142,12 +142,10 @@ async function requireAdminOrRole(req, res, next, allowedRoles = []) {
 // ========== SEGUIMIENTO DE NOTIFICACIONES (para reflejar decisiones web ↔ bot) ==========
 const pendingNotifications = new Map(); // key: "deposit_{id}" o "withdraw_{id}" -> [{chatId, messageId}]
 
-async function updatePendingNotifications(key, statusText, excludeChatId) {
+async function updatePendingNotifications(key, statusText) {
     const entries = pendingNotifications.get(key);
     if (!entries) return;
     for (const { chatId, messageId } of entries) {
-        // No editar la notificación del admin que ejecutó la acción (p. ej. el que rechazó).
-        if (excludeChatId != null && Number(chatId) === Number(excludeChatId)) continue;
         try {
             await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
                 chat_id: chatId,
@@ -4996,7 +4994,7 @@ app.post('/api/admin/pending-deposits/:id/approve', requireAdmin, async (req, re
                 { parse_mode: 'HTML' }
             );
 
-            updatePendingNotifications(`deposit_${id}`, `✅ <b>Depósito #${id} aprobado</b> por un administrador.`, userId);
+            updatePendingNotifications(`deposit_${id}`, `✅ <b>Depósito #${id} aprobado</b> por un administrador.`);
         } catch (e) {}
     })();
 });
@@ -5029,7 +5027,7 @@ app.post('/api/admin/pending-deposits/:id/reject', requireAdmin, async (req, res
         } catch (e) {
             console.error('Error notificando rechazo de depósito:', e);
         }
-        updatePendingNotifications(`deposit_${id}`, `❌ <b>Depósito #${id} rechazado</b> por un administrador.`, userId);
+        updatePendingNotifications(`deposit_${id}`, `❌ <b>Depósito #${id} rechazado</b> por un administrador.`);
     })();
 });
 
@@ -5264,7 +5262,7 @@ app.post('/api/admin/pending-withdraws/:id/approve', requireAdmin, async (req, r
         );
     } catch (e) {}
 
-    updatePendingNotifications(`withdraw_${id}`, `✅ <b>Retiro #${id} aprobado</b> por un administrador.`, userId);
+    updatePendingNotifications(`withdraw_${id}`, `✅ <b>Retiro #${id} aprobado</b> por un administrador.`);
     res.json({ success: true });
 });
 
@@ -5292,7 +5290,7 @@ app.post('/api/admin/pending-withdraws/:id/reject', requireAdmin, async (req, re
         );
     } catch (e) {}
 
-    updatePendingNotifications(`withdraw_${id}`, `❌ <b>Retiro #${id} rechazado</b> por un administrador.`, userId);
+    updatePendingNotifications(`withdraw_${id}`, `❌ <b>Retiro #${id} rechazado</b> por un administrador.`);
     res.json({ success: true });
 });
 
@@ -6630,7 +6628,7 @@ app.post('/api/admin/pending-deposits-role/:id/approve', async (req, res) => {
             }
             text += `\n\n¡Gracias por confiar en nosotros!`;
             if (bot && bot.telegram) await bot.telegram.sendMessage(request.user_id, text, { parse_mode: 'HTML' });
-            updatePendingNotifications(`deposit_${id}`, `✅ <b>Depósito #${id} aprobado</b> por un administrador.`, userId);
+            updatePendingNotifications(`deposit_${id}`, `✅ <b>Depósito #${id} aprobado</b> por un administrador.`);
         } catch (e) {}
     })();
 });
@@ -6652,7 +6650,7 @@ app.post('/api/admin/pending-deposits-role/:id/reject', async (req, res) => {
         try {
             if (bot && bot.telegram) await bot.telegram.sendMessage(request.user_id, `❌ <b>Depósito rechazado</b>\n\n💰 Monto: ${parseFloat(request.amount)} ${String(request.currency || '').toUpperCase()}\n📌 Tu solicitud no pudo ser procesada. Si crees que esto es incorrecto, por favor, contáctanos para más información.`, { parse_mode: 'HTML' });
         } catch (e) {}
-        updatePendingNotifications(`deposit_${id}`, `❌ <b>Depósito #${id} rechazado</b> por un administrador.`, userId);
+        updatePendingNotifications(`deposit_${id}`, `❌ <b>Depósito #${id} rechazado</b> por un administrador.`);
     })();
 });
 
@@ -6715,7 +6713,7 @@ app.post('/api/admin/pending-withdraws-role/:id/approve', async (req, res) => {
             `✅ <b>Retiro aprobado</b>\n\n💰 Monto retirado: ${request.amount} ${String(request.currency || '').toUpperCase()}\n💵 ${(debitPlan.cupDebit === 0 && debitPlan.usdDebit === 1) ? 'Se debitó' : 'Se debitaron'} ${debitPlan.cupDebit.toFixed(2)} CUP y ${debitPlan.usdDebit.toFixed(2)} USD de tu saldo real.\n\n📌 En breve los fondos serán enviados a tu cuenta.`,
             { parse_mode: 'HTML' });
     } catch (e) {}
-    updatePendingNotifications(`withdraw_${id}`, `✅ <b>Retiro #${id} aprobado</b> por un administrador.`, userId);
+    updatePendingNotifications(`withdraw_${id}`, `✅ <b>Retiro #${id} aprobado</b> por un administrador.`);
     res.json({ success: true });
 });
 
@@ -6736,7 +6734,7 @@ app.post('/api/admin/pending-withdraws-role/:id/reject', async (req, res) => {
             `❌ <b>Retiro rechazado</b>\n\n💰 Monto: ${parseFloat(request.amount)} ${String(request.currency || '').toUpperCase()}\n📌 Tu solicitud no pudo ser procesada. Si crees que esto es incorrecto, por favor, contáctanos para más información.`,
             { parse_mode: 'HTML' });
     } catch (e) {}
-    updatePendingNotifications(`withdraw_${id}`, `❌ <b>Retiro #${id} rechazado</b> por un administrador.`, userId);
+    updatePendingNotifications(`withdraw_${id}`, `❌ <b>Retiro #${id} rechazado</b> por un administrador.`);
     res.json({ success: true });
 });
 
