@@ -7592,12 +7592,9 @@ bot.on(message('text'), async (ctx) => {
                     };
                     const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
-                    const isSingleOne = admissibleLines.length === 1 && /:\s*1\.00 (CUP|USD)\.$/.test(admissibleLines[0]);
-                    // El pronombre concuerda con el sustantivo: "apostárselo(s)" para
-                    // número/parlet y "apostársela(s)" para centena.
-                    const question = isSingleOne
-                        ? (betType === 'centena' ? '¿Deseas apostársela?' : '¿Deseas apostárselo?')
-                        : (betType === 'centena' ? '¿Deseas apostárselas?' : '¿Deseas apostárselos?');
+                    // El pronombre se refiere a "el/los monto(s) admisible(s)": masculino
+                    // y sin variación de número.
+                    const question = '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';
                     const omitLabel = betType === 'centena' ? '❌ No, omitirla(s)' : '❌ No, omitirlo(s)';
                     // Telegram dibuja los botones de izquierda a derecha: el
