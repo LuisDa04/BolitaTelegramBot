@@ -2934,7 +2934,24 @@ app.post('/api/bets', async (req, res) => {
                         : isCentena ? (one ? 'centena' : 'centenas')
                             : betType === 'parle' ? (one ? 'parlet' : 'parlets') : betType;
                     const adjective = isCentena ? (one ? 'apostada' : 'apostadas') : (one ? 'apostado' : 'apostados');
-                    return res.status(400).json({ error: `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada y el saldo reembolsado.` });
+                    const cancelMsg = `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada y el saldo reembolsado.`;
+                    // En EDICIÓN, si "No, omitirlo(s)" deja la jugada sin nada que
+                    // guardar, se cancela de verdad (reembolso + borrado) para que ese
+                    // aviso sea cierto. Ocurre antes de tocar saldo y dentro de
+                    // withUserBetLock, igual que el resto del flujo de edición.
+                    if (betId && existingBet) {
+                        await cancelBetAndRefund(existingBet, user);
+                        const updatedUser = await getOrCreateUser(parseInt(userId));
+                        return res.json({
+                            success: true,
+                            betCancelled: true,
+                            message: cancelMsg,
+                            omittedNums,
+                            updatedUser
+                        });
+                    }
+                    // Apuesta nueva: nunca se descontó saldo, se mantiene el aviso.
+                    return res.status(400).json({ error: cancelMsg });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
@@ -3554,33 +3571,13 @@ async function revertBonusIfBelowThreshold(referrerId) {
 }
 
 // --- Cancelar jugada ---
-app.post('/api/bets/:id/cancel', async (req, res) => {
-    const { id } = req.params;
-    const userId = req.verifiedTelegramId || req.body.userId;
-    if (!userId) return res.status(400).json({ error: 'Falta userId' });
-
-    const { data: bet } = await supabase
-        .from('bets')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .single();
-
-    if (!bet) return res.status(404).json({ error: 'Jugada no encontrada' });
-
-    if (bet.session_id) {
-        const { data: session } = await supabase
-            .from('lottery_sessions')
-            .select('status')
-            .eq('id', bet.session_id)
-            .single();
-        if (!session || session.status !== 'open') {
-            return res.status(400).json({ error: 'No se puede cancelar: sesión cerrada' });
-        }
-    }
-
-    const user = await getOrCreateUser(parseInt(userId));
-
+// ========== CANCELAR UNA JUGADA (reembolso + borrado) ==========
+// Revierte la comisión del referidor (si la hubo), reembolsa al apostador lo que
+// gastó —incluido el bono usado— y elimina la fila de `bets`. Es la misma lógica
+// de siempre de /api/bets/:id/cancel, extraída para poder reutilizarla cuando una
+// EDICIÓN se queda sin números al elegir "No, omitirlo(s)".
+async function cancelBetAndRefund(bet, user) {
+    const bettorId = parseInt(bet.user_id);
     //----------- Cambios hechos por Luis David -----------//
     // ========== REVERTIR COMISIÓN DEL REFERIDOR (SIMPLIFICADO) ==========
     if (bet.referrer_id && bet.commission_amount > 0) {
@@ -3646,8 +3643,8 @@ app.post('/api/bets/:id/cancel', async (req, res) => {
 
             // Notificar al referidor (mantener lógica existente o usar la simplificada)
             try {
-                const bettorName = user.first_name || user.username || `ID ${userId}`;
-                const userName = user.first_name || user.username || `ID ${userId}`;
+                const bettorName = user.first_name || user.username || `ID ${bettorId}`;
+                const userName = user.first_name || user.username || `ID ${bettorId}`;
 
                 const referralRate = await getReferralCommissionRate();
                 const percent = referralRate * 100;
@@ -3661,7 +3658,7 @@ app.post('/api/bets/:id/cancel', async (req, res) => {
             } catch (e) {}
         }
     }
-    
+
     //---------- Cambios hechos por Luis David ----------//
     // Eliminamos la vieja logica y calcular los nuevos parametros introducidos
 
@@ -3681,12 +3678,42 @@ app.post('/api/bets/:id/cancel', async (req, res) => {
     await supabase
         .from('users')
         .update({ usd: newUsd, cup: newCup, bonus_cup: newBonus, bonus_updated_by_admin: null, updated_at: new Date() })
-        .eq('telegram_id', userId);
+        .eq('telegram_id', bettorId);
 
     await supabase
         .from('bets')
         .delete()
-        .eq('id', id);
+        .eq('id', bet.id);
+}
+
+app.post('/api/bets/:id/cancel', async (req, res) => {
+    const { id } = req.params;
+    const userId = req.verifiedTelegramId || req.body.userId;
+    if (!userId) return res.status(400).json({ error: 'Falta userId' });
+
+    const { data: bet } = await supabase
+        .from('bets')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single();
+
+    if (!bet) return res.status(404).json({ error: 'Jugada no encontrada' });
+
+    if (bet.session_id) {
+        const { data: session } = await supabase
+            .from('lottery_sessions')
+            .select('status')
+            .eq('id', bet.session_id)
+            .single();
+        if (!session || session.status !== 'open') {
+            return res.status(400).json({ error: 'No se puede cancelar: sesión cerrada' });
+        }
+    }
+
+    const user = await getOrCreateUser(parseInt(userId));
+
+    await cancelBetAndRefund(bet, user);
 
     const updatedUser = await getOrCreateUser(parseInt(userId));
     res.json({ success: true, updatedUser });
