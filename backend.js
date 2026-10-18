@@ -1893,6 +1893,60 @@ async function requireAdmin(req, res, next) {
     next();
 }
 
+// ========== SINCRONIZACIÓN DEL PERFIL (@/NOMBRE) DESDE TELEGRAM ==========
+// El initData que trae la Mini App se congela al cargar la página: si el usuario
+// se cambia el @ con la web abierta, en las peticiones siguientes ya no llega nada
+// nuevo hasta que se recargue. Para que el cambio sí se refleje cuando interactúa
+// con la web, se consulta el estado REAL en Telegram (getChat) y se guarda lo que
+// diga. Throttles:
+//  - por usuario: PROFILE_SYNC_MIN_MS (la web hace polling de saldo cada 5s, así
+//    que sin esto sería un getChat por request).
+//  - global: PROFILE_SYNC_MIN_GLOBAL_MS (evita ráfagas, p. ej. al abrir la webapp
+//    todos a la vez tras un broadcast).
+// Es "fire and forget": no bloquea ni retrasa la petición que lo dispara.
+const profileSyncedAt = new Map(); // telegram_id -> timestamp del último getChat
+const PROFILE_SYNC_MIN_MS = 60 * 1000;       // 1 min por usuario
+const PROFILE_SYNC_MIN_GLOBAL_MS = 250;      // ~4 getChat/s como máximo
+let lastProfileSyncGlobal = 0;
+
+async function syncProfileFromTelegram(telegramId) {
+    const id = parseInt(telegramId);
+    if (!id) return;
+    const now = Date.now();
+    if (now - (profileSyncedAt.get(id) || 0) < PROFILE_SYNC_MIN_MS) return;
+    if (now - lastProfileSyncGlobal < PROFILE_SYNC_MIN_GLOBAL_MS) return;
+    lastProfileSyncGlobal = now;
+    profileSyncedAt.set(id, now);
+    if (profileSyncedAt.size > 5000) profileSyncedAt.clear();
+    try {
+        const { data } = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChat`, {
+            params: { chat_id: id }
+        });
+        const chat = data && data.result;
+        // Solo chats privados: ahí es donde aplican el @ y el nombre.
+        if (!chat || chat.type !== 'private') return;
+        const freshUsername = (typeof chat.username === 'string' && chat.username.trim() !== '')
+            ? chat.username.trim()
+            : null;
+        const freshName = (typeof chat.first_name === 'string' && chat.first_name.trim() !== '')
+            ? chat.first_name.trim()
+            : null;
+        const { data: row } = await supabase
+            .from('users')
+            .select('username, first_name')
+            .eq('telegram_id', id)
+            .maybeSingle();
+        if (!row) return;
+        const updates = {};
+        if ((row.username || null) !== freshUsername) updates.username = freshUsername;
+        if (freshName && row.first_name !== freshName) updates.first_name = freshName;
+        if (Object.keys(updates).length === 0) return;
+        await supabase.from('users').update(updates).eq('telegram_id', id);
+    } catch (e) {
+        // Bot bloqueado, chat inexistente o error de red: se deja la BD como está.
+    }
+}
+
 // ========== MIDDLEWARE DE SEGURIDAD: verifica initData en cada petición ==========
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'];
@@ -1910,6 +1964,9 @@ app.use(async (req, res, next) => {
         try {
             const tgUser = JSON.parse(userStr);
             req.verifiedTelegramId = tgUser.id;
+
+            // Mantener el @ y el nombre al día en la BD (no bloquea la petición).
+            syncProfileFromTelegram(tgUser.id).catch(() => {});
 
             // Usuario eliminado por un admin → bloquear toda la webapp hasta que
             // se registre de nuevo vía bot (/start). Se consulta SIEMPRE: aunque la
