@@ -2934,7 +2934,7 @@ app.post('/api/bets', async (req, res) => {
                         : isCentena ? (one ? 'centena' : 'centenas')
                             : betType === 'parle' ? (one ? 'parlet' : 'parlets') : betType;
                     const adjective = isCentena ? (one ? 'apostada' : 'apostadas') : (one ? 'apostado' : 'apostados');
-                    return res.status(400).json({ error: `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada.` });
+                    return res.status(400).json({ error: `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada y el saldo reembolsado.` });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
