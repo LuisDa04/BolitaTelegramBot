@@ -1807,7 +1807,17 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                         const adjustVerb = singular ? 'se ajustó' : 'se ajustaron';
                         successMsg = `ℹ️ ${capPhrase(singular)} que ${exceedVerb} el máximo ${adjustVerb} al monto permitido.`;
                     }
-                    iziToast.success({ title: isEditing ? '✅ Jugada editada 🍀' : '✅ Jugada registrada 🍀', message: successMsg });
+                    // El 🍀 va al final del "¡Buena suerte!" en las jugadas comunes.
+                    // Si hubo un arreglo por exceso (recorte, omisión o descarte de
+                    // números ya al máximo), el aviso sustituye al "¡Buena suerte!"
+                    // y el trebol se queda en el título para no perderse.
+                    const hadOverLimitFix = wasOmitted || droppedMaxed.length > 0 || (data.clamped && clampedNums.length > 0);
+                    iziToast.success({
+                        title: hadOverLimitFix
+                            ? (isEditing ? '✅ Jugada editada 🍀' : '✅ Jugada registrada 🍀')
+                            : (isEditing ? '✅ Jugada editada' : '✅ Jugada registrada'),
+                        message: hadOverLimitFix ? successMsg : successMsg + ' 🍀'
+                    });
                     currentUser = data.updatedUser;
                     updateBalanceUI();
                     loadBets();

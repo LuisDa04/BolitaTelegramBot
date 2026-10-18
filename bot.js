@@ -2486,13 +2486,18 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
     // Confirmación al usuario
     // Al omitir/recortar números excedidos se muestran solo las jugadas que
     // quedaron, para que la confirmación coincida con lo realmente registrado.
+    // Si hubo un arreglo por exceso (recorte, omisión o descarte de números ya
+    // al máximo), el 🍀 se queda en el título porque el aviso sustituye al
+    // "¡Buena suerte!"; si no, va al final, después de "¡Buena suerte!".
+    const overLimitOpts = arguments[1] || {};
+    const hadOverLimitFix = !!((overLimitOpts.droppedMaxed && overLimitOpts.droppedMaxed.length > 0) || overLimitOpts.clamped || overLimitOpts.omitted);
     let shownJugadas = rawText;
-    let confirmMsg = `✅ <b>Jugada registrada</b> 🍀\n\n` +
+    let confirmMsg = `✅ <b>Jugada registrada</b>${hadOverLimitFix ? ' 🍀' : ''}\n\n` +
         `🎰 Lotería: ${escapeHTML(session?.lottery || 'N/D')}\n` +
         `🔢 Tipo: ${escapeHTML(formatBetTypeLabel(betType))}\n` +
         `📋 Jugadas:\n<code>${escapeHTML(shownJugadas)}</code>\n` +
         `💰 Costo: ${totalCUP.toFixed(2)} CUP / ${totalUSD.toFixed(2)} USD\n\n` +
-        `¡Buena suerte!`;
+        `¡Buena suerte!${hadOverLimitFix ? '' : ' 🍀'}`;
     if (typeof bonusUsed !== 'undefined' && bonusUsed > 0) {
         const remainingBonus = bonusBalance - bonusUsed;
         const esUnSoloCup = Math.abs(bonusUsed - 1) < 1e-6;
@@ -2508,7 +2513,6 @@ async function placeBetAndConfirm(ctx, { uid, user, betType, playSessionId, rawT
     // tipos de apuesta afectados: cuando el aviso habla de un solo número, el
     // sustantivo va en singular y los verbos también ("El número que excedía el
     // máximo se ajustó..."). Sin exceededNums se mantiene el plural de siempre.
-    const overLimitOpts = arguments[1] || {};
     const overLimitSingular = (overLimitOpts.exceededNums || []).length === 1;
     const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const overLimitPhrase = capitalize(overLimitSingular
