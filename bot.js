@@ -7596,9 +7596,11 @@ bot.on(message('text'), async (ctx) => {
                     };
                     const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
-                    // El pronombre se refiere a "el/los monto(s) admisible(s)": masculino
-                    // y sin variación de número.
-                    const question = '¿Deseas apostárselos?';
+                    // El pronombre se refiere a "el/los monto(s) admisible(s)":
+                    // masculino. En singular cuando un solo número excede el
+                    // máximo (sea la moneda y el monto que sea), en plural si son
+                    // varios.
+                    const question = admissibleLines.length === 1 ? '¿Deseas apostárselo?' : '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';
                     const omitLabel = betType === 'centena' ? '❌ No, omitirla(s)' : '❌ No, omitirlo(s)';
                     // Telegram dibuja los botones de izquierda a derecha: el

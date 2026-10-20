@@ -1652,14 +1652,17 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
             }
             if (textEl) {
                 let admissibleHtml = '';
+                let isSingleAdmissible = false;
                 if (exceedData && Array.isArray(exceedData.admissibleLines) && exceedData.admissibleLines.length > 0) {
                     admissibleHtml = exceedData.admissibleLines.join('<br>');
+                    isSingleAdmissible = exceedData.admissibleLines.length === 1;
                 } else {
                     admissibleHtml = limitOverrideAdmissible(exceedData);
                 }
-                // El pronombre se refiere a "el/los monto(s) admisible(s)": masculino
-                // y sin variación de número.
-                const question = '¿Deseas apostárselos?';
+                // El pronombre se refiere a "el/los monto(s) admisible(s)": masculino.
+                // En singular cuando un solo número excede el máximo (sea la
+                // moneda y el monto que sea), en plural si son varios.
+                const question = isSingleAdmissible ? '¿Deseas apostárselo?' : '¿Deseas apostárselos?';
                 const admissibleLine = admissibleHtml ? `<br><br>${admissibleHtml}` : '';
                 textEl.innerHTML = `${errorText}${admissibleLine}<br>${question}`;
             }
