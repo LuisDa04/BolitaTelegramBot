@@ -3636,7 +3636,7 @@ bot.action('bet_override_reject', async (ctx) => {
                 : isCentena ? (one ? 'centena' : 'centenas')
                     : betType === 'parle' ? (one ? 'parlet' : 'parlets') : betType;
             const adjective = isCentena ? (one ? 'apostada' : 'apostadas') : (one ? 'apostado' : 'apostados');
-            const cancelledMsg = `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada.`;
+            const cancelledMsg = `❌ Has omitido ${article} ${typeWord} ${adjective}. Por lo cual la jugada queda cancelada y el saldo reembolsado.`;
             try {
                 await ctx.editMessageText(cancelledMsg, { parse_mode: 'HTML', reply_markup: undefined });
             } catch (e) {
