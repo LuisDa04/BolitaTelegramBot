@@ -2368,7 +2368,10 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
             const container = document.getElementById('betsList');
             const label = document.getElementById('betsCountLabel');
             if (!bets || bets.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-center py-4">No tienes jugadas aún.</p>';
+                container.innerHTML = `<div class="text-gray-400 text-center py-4">
+                    <p>📭 No tienes jugadas aún. ¡Anímate a participar! 🎲</p>
+                    <p class="mt-1">Selecciona "🎮 Jugar" en el menú para empezar.</p>
+                </div>`;
                 if (label) label.textContent = '📋 Historial de apuestas (0)';
                 return;
             }
