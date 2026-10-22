@@ -7974,7 +7974,7 @@ bot.action(/approve_withdraw_(\d+)/, async (ctx) => {
         const debitPlan = await buildRealBalanceDebitPlan(user, amount, request.currency, originalRate);
 
         if (!debitPlan.ok) {
-            await ctx.reply(`❌ ${debitPlan.errorMessage || 'El usuario ya no tiene saldo suficiente para este retiro.'}`);
+            await ctx.reply(debitPlan.errorMessage || '❌ El usuario ya no tiene saldo suficiente para este retiro.');
             return;
         }
 
