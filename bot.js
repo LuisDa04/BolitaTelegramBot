@@ -7970,8 +7970,10 @@ bot.action(/approve_withdraw_(\d+)/, async (ctx) => {
             .single();
 
         const amount = parseFloat(request.amount) || 0;
-        const originalRate = (request.amount_usd > 0) ? (amount / parseFloat(request.amount_usd)) : null;
-        const debitPlan = await buildRealBalanceDebitPlan(user, amount, request.currency, originalRate);
+        // Tasa vigente al aprobar, igual que al crear la solicitud: el
+        // "originalRate" anterior valoraba el saldo USD a ~1 CUP en retiros
+        // MLC/TRX/USDT y daba un falso "saldo insuficiente".
+        const debitPlan = await buildRealBalanceDebitPlan(user, amount, request.currency);
 
         if (!debitPlan.ok) {
             await ctx.reply(debitPlan.errorMessage || '❌ El usuario ya no tiene saldo suficiente para este retiro.');
