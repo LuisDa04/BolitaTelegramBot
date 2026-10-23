@@ -582,11 +582,22 @@ async function getExchangeRates() {
         .select('*')
         .eq('id', 1)
         .single();
+    // Defaults realistas (CUP por unidad)
+    const DEFAULTS = { rate: 110, rate_usdt: 110, rate_trx: 16, rate_mlc: 110 };
+    // Validación: rate debe ser número > 0; si no, usa default y avisa
+    const sanitize = (val, def, name) => {
+        const n = Number(val);
+        if (!Number.isFinite(n) || n <= 0) {
+            console.warn(`[Tasas] ${name} inválido en BD (${val}), usando default ${def}`);
+            return def;
+        }
+        return n;
+    };
     return {
-        rate: data?.rate ?? 110,
-        rate_usdt: data?.rate_usdt ?? 110,
-        rate_trx: data?.rate_trx ?? 1,
-        rate_mlc: data?.rate_mlc ?? 110
+        rate: sanitize(data?.rate, DEFAULTS.rate, 'rate (USD)'),
+        rate_usdt: sanitize(data?.rate_usdt, DEFAULTS.rate_usdt, 'rate_usdt (USDT)'),
+        rate_trx: sanitize(data?.rate_trx, DEFAULTS.rate_trx, 'rate_trx (TRX)'),
+        rate_mlc: sanitize(data?.rate_mlc, DEFAULTS.rate_mlc, 'rate_mlc (MLC)')
     };
 }
 
