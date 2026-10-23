@@ -1242,17 +1242,22 @@ async function fetchOCRRatesFromImage(retries = 2, baseDelay = 2000) {
 
     function isPlausible(currency, value) {
         if (value == null || isNaN(value)) return false;
-        // Rangos absolutos en CUP para evitar confusiones con columnas (USD vs CUP)
-        if (currency === 'TRX') {
-            return value >= 100 && value <= 500; // rango razonable para TRX en CUP
-        }
-        if (currency === 'USDT') {
-            return value >= 600 && value <= 1000; // rango razonable para USDT en CUP
-        }
+        // Rechazar siempre valores ≤ 0 (basura obvia)
+        if (value <= 0) return false;
         const base = currency === 'USDT' ? dbUsdt : dbTrx;
+        // Fallback absolutos muy amplios (red de seguridad)
+        const absMin = currency === 'USDT' ? 200 : 5;
+        const absMax = currency === 'USDT' ? 2000 : 1000;
+        if (value < absMin || value > absMax) return false;
+        // Rango dinámico alrededor de BD (±500 o ±100%, el mayor) - SOLO si base es válida
+        // ACEPTA si está en rango dinámico O en fallback absoluto (UNIÓN)
         if (base != null && base > 0) {
-            return value >= (base - 200) && value <= (base + 200);
+            const margin = Math.max(500, base * 1.0);
+            const dynMin = base - margin;
+            const dynMax = base + margin;
+            return (value >= dynMin && value <= dynMax) || (value >= absMin && value <= absMax);
         }
+        // Sin base válida: solo fallback absoluto
         return true;
     }
 
