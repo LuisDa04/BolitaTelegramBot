@@ -7598,13 +7598,14 @@ bot.on(message('text'), async (ctx) => {
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
                     // El pronombre se refiere a "el/los monto(s) admisible(s)":
                     // masculino. Singular ("apostárselo") SOLO si hay un solo número
-                    // y su monto admisible es exactamente 1 (en CUP o en USD). Con
-                    // varios números, o con un monto distinto de 1, va en plural
-                    // ("apostárselos").
+                    // y su monto admisible total redondea a 1.00 (en CUP o en USD).
+                    // Usamos tolerancia de centavo para evitar falsos negativos por
+                    // punto flotante (p.ej. 0.9999999998 o 1.0000000002).
                     const oneNumber = admissibleLines.length === 1;
                     const admCup = Number(clamped.totalCUP) || 0;
                     const admUsd = Number(clamped.totalUSD) || 0;
-                    const question = (oneNumber && (admCup === 1 || admUsd === 1))
+                    const isOne = (v) => Math.round(v * 100) === 100;
+                    const question = (oneNumber && (isOne(admCup) || isOne(admUsd)))
                         ? '¿Deseas apostárselo?'
                         : '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';
