@@ -678,10 +678,15 @@ async function setExchangeRateTRX(rate) {
 // Convertir cualquier moneda a CUP
 async function convertToCUP(amount, currency) {
     const rates = await getExchangeRates();
+    // Fallback USDT: si rate_usdt es inválido (≤1 o difiere >50% de rate), usar rate (≈USD)
+    const rateUSDT = rates.rate_usdt;
+    const safeRateUSDT = (rateUSDT > 1 && Math.abs(rateUSDT - rates.rate) / rates.rate <= 0.5)
+        ? rateUSDT
+        : rates.rate;
     switch (String(currency).toUpperCase()) {
         case 'CUP': return amount;
         case 'USD': return amount * rates.rate;
-        case 'USDT': return amount * rates.rate_usdt;
+        case 'USDT': return amount * safeRateUSDT;
         case 'TRX': return amount * rates.rate_trx;
         case 'MLC': return amount * rates.rate_mlc;
         default: return 0;
@@ -691,10 +696,14 @@ async function convertToCUP(amount, currency) {
 // Convertir de CUP a otra moneda
 async function convertFromCUP(amountCUP, targetCurrency) {
     const rates = await getExchangeRates();
+    const rateUSDT = rates.rate_usdt;
+    const safeRateUSDT = (rateUSDT > 1 && Math.abs(rateUSDT - rates.rate) / rates.rate <= 0.5)
+        ? rateUSDT
+        : rates.rate;
     switch (String(targetCurrency).toUpperCase()) {
         case 'CUP': return amountCUP;
         case 'USD': return amountCUP / rates.rate;
-        case 'USDT': return amountCUP / rates.rate_usdt;
+        case 'USDT': return amountCUP / safeRateUSDT;
         case 'TRX': return amountCUP / rates.rate_trx;
         case 'MLC': return amountCUP / rates.rate_mlc;
         default: return 0;
