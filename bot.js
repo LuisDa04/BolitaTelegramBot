@@ -97,7 +97,7 @@ const MENU_COMMANDS = [
   { command: 'mi_dinero', description: '💰 Mi dinero' },
   { command: 'mis_jugadas', description: '📋 Mis jugadas' },
   { command: 'referidos', description: '👥 Referidos' },
-    { command: 'webapp', description: '🌐 Abrir Web-App' },
+    { command: 'web_app', description: '🌐 Abrir Web-App' },
   { command: 'ayuda', description: '❓ Ayuda' },
     { command: 'cancel', description: '❌ Cancelar operación' }
 ];
@@ -3387,7 +3387,7 @@ bot.command('ayuda', async (ctx) => {
     );
 });
 
-bot.command('webapp', async (ctx) => {
+bot.command('web_app', async (ctx) => {
     const webAppButton = Markup.inlineKeyboard([
         Markup.button.webApp('🚀 Abrir Web-App', `${WEBAPP_URL}/app.html`)
     ]);
