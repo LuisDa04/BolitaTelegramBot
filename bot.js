@@ -7630,7 +7630,8 @@ bot.on(message('text'), async (ctx) => {
                     const admCup = Number(clamped.totalCUP) || 0;
                     const admUsd = Number(clamped.totalUSD) || 0;
                     const isOne = (v) => Math.round(v * 100) === 100;
-                    const question = (oneNumber && (isOne(admCup) || isOne(admUsd)))
+                    const totalAdm = admCup + admUsd;
+                    const question = (oneNumber && (isOne(admCup) || isOne(admUsd) || isOne(totalAdm)))
                         ? '¿Deseas apostárselo?'
                         : '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';
