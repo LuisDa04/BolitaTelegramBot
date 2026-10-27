@@ -7619,19 +7619,14 @@ bot.on(message('text'), async (ctx) => {
                         exceedData: limitCheck.exceedData,
                         error: limitCheck.error
                     };
-                    const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
-                    // El pronombre se refiere a "el/los monto(s) admisible(s)":
-                    // masculino. Singular ("apostárselo") SOLO si hay un solo número
-                    // y su monto admisible redondea a 1.00 (en CUP o en USD).
-                    // Mismo criterio que la web (app.html): no se suma CUP+USD.
-                    // Usamos tolerancia de centavo para evitar falsos negativos por
-                    // punto flotante (p.ej. 0.9999999998 o 1.0000000002).
-                    const oneNumber = admissibleLines.length === 1;
-                    const admCup = Number(clamped.totalCUP) || 0;
-                    const admUsd = Number(clamped.totalUSD) || 0;
-                    const isOne = (v) => Math.round(v * 100) === 100;
-                    const question = (oneNumber && (isOne(admCup) || isOne(admUsd)))
+                    // El pronombre se refiere a "el monto admisible" mostrado en la
+                    // línea. Singular ("apostárselo") SOLO si hay un solo número
+                    // excedido y su línea dice exactamente 1.00 CUP o 1.00 USD.
+                    // Mismo criterio que la web (app.html).
+                    const isSingleOne = admissibleLines.length === 1
+                        && /:\s*1\.00 (CUP|USD)\.$/.test(admissibleLines[0]);
+                    const question = isSingleOne
                         ? '¿Deseas apostárselo?'
                         : '¿Deseas apostárselos?';
                     const admissibleLine = admissibleLines.length > 0 ? `\n\n${admissibleLines.join('\n')}` : '';

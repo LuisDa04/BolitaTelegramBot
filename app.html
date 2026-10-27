@@ -1652,17 +1652,13 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
             }
             if (textEl) {
                 let admissibleHtml = '';
-                // Singular ("apostárselo") SOLO si hay un solo número y su monto
-                // admisible total redondea a 1.00 (en CUP o en USD).
-                // Tolerancia de centavo para evitar falsos negativos por punto flotante.
+                // Singular ("apostárselo") SOLO si hay un solo número excedido y
+                // su línea dice exactamente 1.00 CUP o 1.00 USD.
                 let isSingleAdmissible = false;
                 if (exceedData && Array.isArray(exceedData.admissibleLines) && exceedData.admissibleLines.length > 0) {
                     admissibleHtml = exceedData.admissibleLines.join('<br>');
-                    const oneNumber = exceedData.admissibleLines.length === 1;
-                    const admCup = Number(exceedData.admissibleCup) || 0;
-                    const admUsd = Number(exceedData.admissibleUsd) || 0;
-                    const isOne = (v) => Math.round(v * 100) === 100;
-                    isSingleAdmissible = oneNumber && (isOne(admCup) || isOne(admUsd));
+                    isSingleAdmissible = exceedData.admissibleLines.length === 1
+                        && /:\s*1\.00 (CUP|USD)\.$/.test(exceedData.admissibleLines[0]);
                 } else {
                     admissibleHtml = limitOverrideAdmissible(exceedData);
                 }
