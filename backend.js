@@ -2738,6 +2738,34 @@ app.post('/api/transfer', async (req, res) => {
 });
 
 // --- Registro de apuestas ---
+// --- Cerrar modal del bot al resolver desde la web (sin tocar BD) ---
+const closeBotLimitModal = async (telegramUserId) => {
+    try {
+        const botInst = require('./bot.js');
+        const botRef = botInst.default || botInst;
+        const uidNum = Number(telegramUserId);
+        if (!uidNum || !botRef || !botRef.telegram || !botRef.pendingLimitModals) return;
+        const pending = botRef.pendingLimitModals.get(uidNum);
+        if (!pending) return;
+        try {
+            await botRef.telegram.editMessageText(pending.chatId, pending.messageId, undefined, String.fromCharCode(10060) + ' Apuesta cancelada.', { reply_markup: { inline_keyboard: [] } });
+        } catch (e) {}
+        try {
+            if (botRef.localSession && pending.fromId != null) {
+                const chatIdKey = pending.chatId != null ? pending.chatId : pending.fromId;
+                const key = chatIdKey + ':' + pending.fromId;
+                const sess = botRef.localSession.getSession ? botRef.localSession.getSession(key) : null;
+                if (sess && (sess.pendingBetOverride || sess.pendingMaxedOverride)) {
+                    if (sess.pendingBetOverride) delete sess.pendingBetOverride;
+                    if (sess.pendingMaxedOverride) delete sess.pendingMaxedOverride;
+                    await botRef.localSession.saveSession(key, sess);
+                }
+            }
+        } catch (e) {}
+        botRef.pendingLimitModals.delete(uidNum);
+    } catch (e) {}
+};
+
 app.post('/api/bets', async (req, res) => {
     const { lottery, betType, rawText, sessionId, betId } = req.body;
     const userId = req.verifiedTelegramId || req.body.userId;
@@ -2869,6 +2897,7 @@ app.post('/api/bets', async (req, res) => {
             const nothingToApply = (clampedNoop.totalCUP <= 0 && clampedNoop.totalUSD <= 0)
                 || betTotalsEqual(betTotalsByNum(clampedNoop.items, betType), betTotalsByNum(existingBet.items, betType));
             if (nothingToApply) {
+                try { await closeBotLimitModal(userId); } catch (e) {}
                 return res.status(400).json({
                     error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
                     code: 'EDIT_NOTHING_TO_APPLY'
@@ -2902,6 +2931,7 @@ app.post('/api/bets', async (req, res) => {
                     // Red de seguridad: el atajo de arriba ya corta este caso
                     // antes de ofrecer el modal. Si aun así se llegara aquí, la
                     // apuesta NO se toca (aún no se reembolsó nada): solo avisar.
+                    try { await closeBotLimitModal(userId); } catch (e) {}
                     return res.status(400).json({
                         error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
                         code: 'EDIT_NOTHING_TO_APPLY'
@@ -2915,6 +2945,7 @@ app.post('/api/bets', async (req, res) => {
                 totalCUP = clamped.totalCUP;
                 totalUSD = clamped.totalUSD;
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
+                try { await closeBotLimitModal(userId); } catch (e) {}
             } else {
                 return res.status(400).json({
                     error: maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion }),
@@ -2932,6 +2963,7 @@ app.post('/api/bets', async (req, res) => {
             if (req.body.confirmLimitOverride === true) {
                 const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
+                    try { await closeBotLimitModal(userId); } catch (e) {}
                     return res.status(400).json({ error: '❌ Después del recorte no queda monto válido en la jugada. La apuesta fue cancelada.' });
                 }
                 clampApplied = true;
@@ -2940,6 +2972,7 @@ app.post('/api/bets', async (req, res) => {
                 totalCUP = clamped.totalCUP;
                 totalUSD = clamped.totalUSD;
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
+                try { await closeBotLimitModal(userId); } catch (e) {}
             } else if (req.body.omitLimitOverride === true) {
                 const omitted = omitExceededNumbers(parsed.items, betType, limitCheck.exceedData);
                 omittedNums = [...new Set(omitted.omittedItems.map(it => String(betNumOf(it, betType))))];
@@ -2960,6 +2993,7 @@ app.post('/api/bets', async (req, res) => {
                     // aviso lo dice. Ocurre antes de tocar saldo y dentro de
                     // withUserBetLock, igual que el resto del flujo de edición.
                     if (betId && existingBet) {
+                        try { await closeBotLimitModal(userId); } catch (e) {}
                         await cancelBetAndRefund(existingBet, user);
                         const updatedUser = await getOrCreateUser(parseInt(userId));
                         return res.json({
@@ -2972,6 +3006,7 @@ app.post('/api/bets', async (req, res) => {
                     }
                     // Apuesta nueva: nunca se descontó saldo, así que no hay nada
                     // que reembolsar y el aviso no lo menciona.
+                    try { await closeBotLimitModal(userId); } catch (e) {}
                     return res.status(400).json({ error: `${cancelMsgBase}.` });
                 }
                 parsed.items = omitted.items;
