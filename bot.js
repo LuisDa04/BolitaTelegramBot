@@ -124,6 +124,9 @@ setMenuCommandsWithRetry();
 // ========== SESIÓN LOCAL ==========
 const localSession = new LocalSession({ database: 'session_db.json' });
 bot.use(localSession.middleware());
+// Exponer para que backend.js pueda limpiar la sesión del bot al resolver desde la web
+bot.localSession = localSession;
+if (!bot.pendingLimitModals) bot.pendingLimitModals = new Map();
 
 // ========== FUNCIÓN PARA VERIFICAR SI UN USUARIO ES ADMIN ==========
 function isAdmin(userId) {
@@ -3577,6 +3580,8 @@ bot.action(/type_(.+)/, async (ctx) => {
 bot.action('bet_override_accept', async (ctx) => {
     try {
         await ctx.answerCbQuery().catch(() => {});
+        const uid = ctx.from.id;
+        if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
         const override = ctx.session?.pendingBetOverride;
         if (!override) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3596,7 +3601,6 @@ bot.action('bet_override_accept', async (ctx) => {
             return;
         }
 
-        const uid = ctx.from.id;
         const user = ctx.dbUser || { cup: 0, usd: 0, bonus_cup: 0 };
         ctx.session.pendingBetOverride = null;
 
@@ -3625,6 +3629,8 @@ bot.action('bet_override_accept', async (ctx) => {
 bot.action('bet_override_reject', async (ctx) => {
     try {
         await ctx.answerCbQuery().catch(() => {});
+        const uid = ctx.from.id;
+        if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
         const override = ctx.session?.pendingBetOverride;
         if (!override) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3632,7 +3638,6 @@ bot.action('bet_override_reject', async (ctx) => {
         }
 
         const { betType, rawText, items, sessionId, exceedData } = override;
-        const uid = ctx.from.id;
         const user = ctx.dbUser || { cup: 0, usd: 0, bonus_cup: 0 };
 
         if (!sessionId) {
@@ -3698,6 +3703,8 @@ bot.action('bet_override_reject', async (ctx) => {
 bot.action('bet_maxed_accept', async (ctx) => {
     try {
         await ctx.answerCbQuery().catch(() => {});
+        const uid = ctx.from.id;
+        if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
         const pending = ctx.session?.pendingMaxedOverride;
         if (!pending) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3721,7 +3728,6 @@ bot.action('bet_maxed_accept', async (ctx) => {
         const afterNums = new Set(clamped.items.map(it => String(numOf(it))));
         const droppedMaxed = beforeNums.filter(n => !afterNums.has(n));
 
-        const uid = ctx.from.id;
         const user = ctx.dbUser || { cup: 0, usd: 0, bonus_cup: 0 };
         if (ctx.session) ctx.session.pendingMaxedOverride = null;
 
@@ -3750,6 +3756,8 @@ bot.action('bet_maxed_accept', async (ctx) => {
 bot.action('bet_maxed_abort', async (ctx) => {
     try {
         await ctx.answerCbQuery().catch(() => {});
+        const uid = ctx.from.id;
+        if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
         if (ctx.session) ctx.session.pendingMaxedOverride = null;
         try { await ctx.deleteMessage(); } catch (e) {}
         await ctx.reply('❌ Tu apuesta no se registró.', getMainKeyboard(ctx)).catch(() => {});
@@ -7599,12 +7607,23 @@ bot.on(message('text'), async (ctx) => {
                     };
                     // Telegram dibuja los botones de izquierda a derecha: el
                     // "No" va a la izquierda y el "Sí, continuar" a la derecha.
-                    await ctx.reply(maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion: false }), {
+                    const sentMaxed = await ctx.reply(maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion: false }), {
                         reply_markup: Markup.inlineKeyboard([
                             [Markup.button.callback('❌ No, abortar', 'bet_maxed_abort'),
                              Markup.button.callback('✅ Sí, continuar', 'bet_maxed_accept')]
                         ]).reply_markup
                     });
+                    try {
+                        if (bot.pendingLimitModals) {
+                            bot.pendingLimitModals.set(uid, {
+                                chatId: ctx.chat.id,
+                                messageId: sentMaxed.message_id,
+                                type: 'bet_maxed',
+                                fromId: ctx.from.id,
+                                at: Date.now()
+                            });
+                        }
+                    } catch (e) {}
                     return;
                 }
                 if (limitCheck.confirmable) {
@@ -7633,12 +7652,23 @@ bot.on(message('text'), async (ctx) => {
                     const omitLabel = betType === 'centena' ? '❌ No, omitirla(s)' : '❌ No, omitirlo(s)';
                     // Telegram dibuja los botones de izquierda a derecha: el
                     // "No" va a la izquierda y el "Sí, apostar" a la derecha.
-                    await ctx.reply(`${limitCheck.error}${admissibleLine}\n${question}`, {
+                    const sentOverride = await ctx.reply(`${limitCheck.error}${admissibleLine}\n${question}`, {
                         reply_markup: Markup.inlineKeyboard([
                             [Markup.button.callback(omitLabel, 'bet_override_reject'),
                              Markup.button.callback('✅ Sí, apostar', 'bet_override_accept')]
                         ]).reply_markup
                     });
+                    try {
+                        if (bot.pendingLimitModals) {
+                            bot.pendingLimitModals.set(uid, {
+                                chatId: ctx.chat.id,
+                                messageId: sentOverride.message_id,
+                                type: 'bet_override',
+                                fromId: ctx.from.id,
+                                at: Date.now()
+                            });
+                        }
+                    } catch (e) {}
                     return;
                 }
                 // Todos los números excedidos están ya en su tope: no queda nada
