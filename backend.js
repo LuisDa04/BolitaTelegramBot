@@ -17,6 +17,9 @@ const moment = require('moment-timezone');
 // ========== IMPORTAR BOT DE TELEGRAM ==========
 let bot; 
 let botInfo = { username: 'bot', first_name: 'Bot' };
+// Tracking cross-channel por elementos canónicos (intersección)
+if (!global.resolvedWebCanon) global.resolvedWebCanon = new Map();
+if (!global.resolvedBotCanon) global.resolvedBotCanon = new Map();
 
 // ======== == CONFIGURACIÓN DESDE .ENV ==========
 const SECURITY = process.env.AUTH;
@@ -59,6 +62,96 @@ const regionMap = {
 };
 
 // ========== FUNCIONES AUXILIARES ==========
+
+function canonizeItemsSet(items = [], betType) {
+    const set = new Set();
+    try {
+        for (const it of items || []) {
+            if (!it) continue;
+            if (betType === 'parle') {
+                const v = (typeof normalizeParleValue === 'function' ? normalizeParleValue(it.numero) : it.numero);
+                if (v != null && String(v).trim()) {
+                    set.add(String(v).trim());
+                }
+                continue;
+            }
+            if (it.numero != null && String(it.numero).trim()) {
+                set.add(String(it.numero).trim());
+            }
+        }
+    } catch (e) {}
+    return set;
+}
+
+function setsIntersect(a, b) {
+    if (!a || !b) return false;
+    const small = a.size <= b.size ? a : b;
+    const large = a.size <= b.size ? b : a;
+    for (const x of small) {
+        if (large.has(x)) return true;
+    }
+    return false;
+}
+
+async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betType = null) {
+    try {
+        const uidNum = Number(userId);
+        if (!uidNum || !canonSet || canonSet.size === 0) return;
+        const botInst = require('./bot.js');
+        const botRef = botInst.default || botInst;
+        if (!botRef) return;
+        // Limpiar entradas del mapa del bot con intersección
+        try {
+            if (botRef.pendingLimitModals && typeof botRef.pendingLimitModals.forEach === 'function') {
+                for (const [key, entry] of botRef.pendingLimitModals.entries()) {
+                    try {
+                        const entryUid = Number(entry?.fromId || entry?.uid || key);
+                        if (entryUid !== uidNum) continue;
+                        const entryCanon = entry?.canon ? new Set(entry.canon) : null;
+                        if (!entryCanon || entryCanon.size === 0) continue;
+                        if (setsIntersect(canonSet, entryCanon)) {
+                            // Editar mensaje
+                            try {
+                                if (botRef.telegram && entry.chatId && entry.messageId) {
+                                    await botRef.telegram.editMessageText(entry.chatId, entry.messageId, undefined, String.fromCharCode(10060) + ' Esta jugada ya fue resuelta desde la web.', { reply_markup: { inline_keyboard: [] } });
+                                }
+                            } catch (e) {}
+                            botRef.pendingLimitModals.delete(key);
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+        // Limpiar sesiones del bot
+        try {
+            if (botRef.localSession && typeof botRef.localSession.getSession === 'function') {
+                // Intentar claves comunes
+                const candidates = [];
+                if (sessionId) candidates.push(sessionId + ':' + uidNum);
+                candidates.push(uidNum + ':' + uidNum);
+                for (const cKey of candidates) {
+                    try {
+                        const sess = botRef.localSession.getSession(cKey);
+                        if (sess) {
+                            let changed = false;
+                            if (sess.pendingBetOverride) {
+                                const sc = sess.pendingBetOverride?.canon ? new Set(sess.pendingBetOverride.canon) : canonizeItemsSet(sess.pendingBetOverride.items, sess.pendingBetOverride.betType || betType);
+                                if (setsIntersect(canonSet, sc)) { delete sess.pendingBetOverride; changed = true; }
+                            }
+                            if (sess.pendingMaxedOverride) {
+                                const sc2 = sess.pendingMaxedOverride?.canon ? new Set(sess.pendingMaxedOverride.canon) : canonizeItemsSet(sess.pendingMaxedOverride.items, sess.pendingMaxedOverride.betType || betType);
+                                if (setsIntersect(canonSet, sc2)) { delete sess.pendingMaxedOverride; changed = true; }
+                            }
+                            if (changed && typeof botRef.localSession.saveSession === 'function') {
+                                await botRef.localSession.saveSession(cKey, sess);
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+    } catch (e) {}
+}
 
 function isAdmin(userId) {
     return ADMIN_IDS.includes(Number(userId));
@@ -2945,8 +3038,22 @@ app.post('/api/bets', async (req, res) => {
                 totalCUP = clamped.totalCUP;
                 totalUSD = clamped.totalUSD;
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
+                try {
+                    const cweb = canonizeItemsSet(parsed.items, betType);
+                    if (cweb.size > 0) {
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                    }
+                } catch (e) {}
                 try { await closeBotLimitModal(userId); } catch (e) {}
             } else {
+                try {
+                    const cweb = canonizeItemsSet(parsed.items, betType);
+                    if (cweb.size > 0) {
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                    }
+                } catch (e) {}
                 return res.status(400).json({
                     error: maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion }),
                     code: esEdicion ? 'MAXED_NUMBERS_ON_EDIT' : 'MAXED_NUMBERS_ON_BET',
@@ -2961,9 +3068,18 @@ app.post('/api/bets', async (req, res) => {
             // Llega también en edición, cuando no hay ningún número ya apostado al
             // máximo y por eso no se pregunta con el aviso ⚠️ de arriba.
             if (req.body.confirmLimitOverride === true) {
+                // Marcar resuelto desde web por intersección y matar pendings del bot
+                try {
+                    const cweb = canonizeItemsSet(parsed.items, betType);
+                    if (cweb.size > 0) {
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                    }
+                } catch (e) {}
                 const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
                     try { await closeBotLimitModal(userId); } catch (e) {}
+                    try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                     return res.status(400).json({ error: '❌ Después del recorte no queda monto válido en la jugada. La apuesta fue cancelada.' });
                 }
                 clampApplied = true;
@@ -2974,6 +3090,14 @@ app.post('/api/bets', async (req, res) => {
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
                 try { await closeBotLimitModal(userId); } catch (e) {}
             } else if (req.body.omitLimitOverride === true) {
+                // Marcar resuelto desde web por intersección
+                try {
+                    const cweb = canonizeItemsSet(parsed.items, betType);
+                    if (cweb.size > 0) {
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                    }
+                } catch (e) {}
                 const omitted = omitExceededNumbers(parsed.items, betType, limitCheck.exceedData);
                 omittedNums = [...new Set(omitted.omittedItems.map(it => String(betNumOf(it, betType))))];
                 if (omitted.totalCUP <= 0 && omitted.totalUSD <= 0) {
@@ -2994,6 +3118,7 @@ app.post('/api/bets', async (req, res) => {
                     // withUserBetLock, igual que el resto del flujo de edición.
                     if (betId && existingBet) {
                         try { await closeBotLimitModal(userId); } catch (e) {}
+                        try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                         await cancelBetAndRefund(existingBet, user);
                         const updatedUser = await getOrCreateUser(parseInt(userId));
                         return res.json({
@@ -3007,12 +3132,14 @@ app.post('/api/bets', async (req, res) => {
                     // Apuesta nueva: nunca se descontó saldo, así que no hay nada
                     // que reembolsar y el aviso no lo menciona.
                     try { await closeBotLimitModal(userId); } catch (e) {}
+                    try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                     return res.status(400).json({ error: `${cancelMsgBase}.` });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
                 totalUSD = omitted.totalUSD;
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
+                try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
             } else {
                 const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
                 return res.status(400).json({

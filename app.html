@@ -1861,7 +1861,15 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
                         pendingBetPayload = payload;
                         showLimitOverrideModal(data.error, data.exceedData);
                     } else {
-                        iziToast.error({ message: data.error || 'No se pudo registrar' });
+                        if (data.code === 'RESOLVED_ELSEWHERE') {
+                            try { document.getElementById('limitOverrideModal')?.classList.add('hidden'); } catch (e) {}
+                            try { document.getElementById('maxedEditModal')?.classList.add('hidden'); } catch (e) {}
+                            pendingBetPayload = null;
+                            pendingMaxedFlow = null;
+                            iziToast.error({ message: data.error || '❌ Esta jugada ya fue resuelta desde el bot.' });
+                        } else {
+                            iziToast.error({ message: data.error || 'No se pudo registrar' });
+                        }
                     }
                 }
             } catch (e) {

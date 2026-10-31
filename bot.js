@@ -124,9 +124,39 @@ setMenuCommandsWithRetry();
 // ========== SESIÓN LOCAL ==========
 const localSession = new LocalSession({ database: 'session_db.json' });
 bot.use(localSession.middleware());
+// Tracking cross-channel
+if (!global.resolvedWebCanon) global.resolvedWebCanon = new Map();
+if (!global.resolvedBotCanon) global.resolvedBotCanon = new Map();
 // Exponer para que backend.js pueda limpiar la sesión del bot al resolver desde la web
 bot.localSession = localSession;
 if (!bot.pendingLimitModals) bot.pendingLimitModals = new Map();
+
+// ========== FUNCIONES AUXILIARES PARA CRUCE ==========
+function canonizeItemsSetBot(items = [], betType) {
+    const set = new Set();
+    try {
+        for (const it of items || []) {
+            if (!it) continue;
+            if (betType === 'parle') {
+                const v = (typeof normalizeParleValue === 'function' ? normalizeParleValue(it.numero) : it.numero);
+                if (v != null && String(v).trim()) set.add(String(v).trim());
+                continue;
+            }
+            if (it.numero != null && String(it.numero).trim()) set.add(String(it.numero).trim());
+        }
+    } catch (e) {}
+    return set;
+}
+
+function setsIntersectBot(a, b) {
+    if (!a || !b) return false;
+    const small = a.size <= b.size ? a : b;
+    const large = a.size <= b.size ? b : a;
+    for (const x of small) {
+        if (large.has(x)) return true;
+    }
+    return false;
+}
 
 // ========== FUNCIÓN PARA VERIFICAR SI UN USUARIO ES ADMIN ==========
 function isAdmin(userId) {
@@ -3582,6 +3612,25 @@ bot.action('bet_override_accept', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        // Verificar intersección con resuelto desde web
+        try {
+            const overrideCheck = ctx.session?.pendingBetOverride;
+            if (overrideCheck) {
+                const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
+                const rw = global.resolvedWebCanon?.get(Number(uid));
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                    try { delete ctx.session.pendingBetOverride; } catch (e) {}
+                    try { await ctx.deleteMessage(); } catch (e) {}
+                    try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
+                    await ctx.reply('❌ Esta jugada ya fue resuelta desde la web.', getMainKeyboard(ctx)).catch(() => {});
+                    return;
+                }
+                // Marcar como resuelto desde bot
+                try {
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, at: Date.now() });
+                } catch (e) {}
+            }
+        } catch (e) {}
         const override = ctx.session?.pendingBetOverride;
         if (!override) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3631,6 +3680,23 @@ bot.action('bet_override_reject', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        try {
+            const overrideCheck = ctx.session?.pendingBetOverride;
+            if (overrideCheck) {
+                const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
+                const rw = global.resolvedWebCanon?.get(Number(uid));
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                    try { delete ctx.session.pendingBetOverride; } catch (e) {}
+                    try { await ctx.deleteMessage(); } catch (e) {}
+                    try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
+                    await ctx.reply('❌ Esta jugada ya fue resuelta desde la web.', getMainKeyboard(ctx)).catch(() => {});
+                    return;
+                }
+                try {
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, at: Date.now() });
+                } catch (e) {}
+            }
+        } catch (e) {}
         const override = ctx.session?.pendingBetOverride;
         if (!override) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3705,6 +3771,23 @@ bot.action('bet_maxed_accept', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        try {
+            const pendingCheck = ctx.session?.pendingMaxedOverride;
+            if (pendingCheck) {
+                const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
+                const rw = global.resolvedWebCanon?.get(Number(uid));
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                    try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
+                    try { await ctx.deleteMessage(); } catch (e) {}
+                    try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
+                    await ctx.reply('❌ Esta jugada ya fue resuelta desde la web.', getMainKeyboard(ctx)).catch(() => {});
+                    return;
+                }
+                try {
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, at: Date.now() });
+                } catch (e) {}
+            }
+        } catch (e) {}
         const pending = ctx.session?.pendingMaxedOverride;
         if (!pending) {
             await safeEdit(ctx, '⏳ Esta confirmación ya no está disponible. Por favor, envía tu jugada de nuevo.', null);
@@ -3758,6 +3841,23 @@ bot.action('bet_maxed_abort', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        try {
+            const pendingCheck = ctx.session?.pendingMaxedOverride;
+            if (pendingCheck) {
+                const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
+                const rw = global.resolvedWebCanon?.get(Number(uid));
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                    try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
+                    try { await ctx.deleteMessage(); } catch (e) {}
+                    try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
+                    await ctx.reply('❌ Esta jugada ya fue resuelta desde la web.', getMainKeyboard(ctx)).catch(() => {});
+                    return;
+                }
+                try {
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, at: Date.now() });
+                } catch (e) {}
+            }
+        } catch (e) {}
         if (ctx.session) ctx.session.pendingMaxedOverride = null;
         try { await ctx.deleteMessage(); } catch (e) {}
         await ctx.reply('❌ Tu apuesta no se registró.', getMainKeyboard(ctx)).catch(() => {});
@@ -7603,10 +7703,20 @@ bot.on(message('text'), async (ctx) => {
                         items: parsed.items,
                         sessionId: playSessionId,
                         lottery: session.lottery || null,
-                        exceedData: limitCheck.exceedData
+                        exceedData: limitCheck.exceedData,
+                        canon: Array.from(canonizeItemsSetBot(parsed.items, betType))
                     };
                     // Telegram dibuja los botones de izquierda a derecha: el
                     // "No" va a la izquierda y el "Sí, continuar" a la derecha.
+                    session.pendingMaxedOverride = {
+                        betType,
+                        rawText,
+                        items: parsed.items,
+                        sessionId: playSessionId,
+                        lottery: session.lottery || null,
+                        exceedData: limitCheck.exceedData,
+                        canon: Array.from(canonizeItemsSetBot(parsed.items, betType))
+                    };
                     const sentMaxed = await ctx.reply(maxedNoticeText(betType, maxedOverall, limitCheck.exceedData, { esEdicion: false }), {
                         reply_markup: Markup.inlineKeyboard([
                             [Markup.button.callback('❌ No, abortar', 'bet_maxed_abort'),
@@ -7620,7 +7730,10 @@ bot.on(message('text'), async (ctx) => {
                                 messageId: sentMaxed.message_id,
                                 type: 'bet_maxed',
                                 fromId: ctx.from.id,
-                                at: Date.now()
+                                at: Date.now(),
+                                canon: Array.from(canonizeItemsSetBot(parsed.items, betType)),
+                                betType,
+                                sessionId: playSessionId
                             });
                         }
                     } catch (e) {}
@@ -7636,7 +7749,8 @@ bot.on(message('text'), async (ctx) => {
                         sessionId: playSessionId,
                         lottery: session.lottery || null,
                         exceedData: limitCheck.exceedData,
-                        error: limitCheck.error
+                        error: limitCheck.error,
+                        canon: Array.from(canonizeItemsSetBot(parsed.items, betType))
                     };
                     const admissibleLines = admissibleLinesForNumbers(parsed.items, betType, limitCheck.exceedData);
                     // El pronombre se refiere a "el monto admisible" mostrado en la
@@ -7665,7 +7779,10 @@ bot.on(message('text'), async (ctx) => {
                                 messageId: sentOverride.message_id,
                                 type: 'bet_override',
                                 fromId: ctx.from.id,
-                                at: Date.now()
+                                at: Date.now(),
+                                canon: Array.from(canonizeItemsSetBot(parsed.items, betType)),
+                                betType,
+                                sessionId: playSessionId
                             });
                         }
                     } catch (e) {}
