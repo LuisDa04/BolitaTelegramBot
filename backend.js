@@ -3077,6 +3077,18 @@ app.post('/api/bets', async (req, res) => {
         if (isMaxedFlow) {
             maxedFlow = maxedOverall;
             if (req.body.confirmLimitOverride === true) {
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web)
+                try {
+                    const rb = global.resolvedBotCanon?.get(Number(userId));
+                    if (rb?.canonSet && rb.lottery === lottery && rb.betType === betType) {
+                        const cwebCheck = canonizeItemsSet(parsed.items, betType);
+                        if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            global.resolvedBotCanon?.delete(Number(userId));
+                            try { await closeBotLimitModal(userId); } catch (e) {}
+                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot. Usa el menú "🎲 Jugar" para continuar apostando', code: 'RESOLVED_ELSEWHERE' });
+                        }
+                    }
+                } catch (e) {}
                 // Confirmado: el recorte ajusta a `máximo − otras jugadas` cada
                 // número excedido. Para los que ya estaban en su tope eso es
                 // justo el monto que la jugada ya tenía (se conserva su wager); el
@@ -3147,6 +3159,18 @@ app.post('/api/bets', async (req, res) => {
             // Llega también en edición, cuando no hay ningún número ya apostado al
             // máximo y por eso no se pregunta con el aviso ⚠️ de arriba.
             if (req.body.confirmLimitOverride === true) {
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web)
+                try {
+                    const rb = global.resolvedBotCanon?.get(Number(userId));
+                    if (rb?.canonSet && rb.lottery === lottery && rb.betType === betType) {
+                        const cwebCheck = canonizeItemsSet(parsed.items, betType);
+                        if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            global.resolvedBotCanon?.delete(Number(userId));
+                            try { await closeBotLimitModal(userId); } catch (e) {}
+                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot. Usa el menú "🎲 Jugar" para continuar apostando', code: 'RESOLVED_ELSEWHERE' });
+                        }
+                    }
+                } catch (e) {}
                 // Marcar resuelto desde web por intersección y matar pendings del bot
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
@@ -3184,6 +3208,18 @@ app.post('/api/bets', async (req, res) => {
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
                 try { await closeBotLimitModal(userId); } catch (e) {}
             } else if (req.body.omitLimitOverride === true) {
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web)
+                try {
+                    const rb = global.resolvedBotCanon?.get(Number(userId));
+                    if (rb?.canonSet && rb.lottery === lottery && rb.betType === betType) {
+                        const cwebCheck = canonizeItemsSet(parsed.items, betType);
+                        if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            global.resolvedBotCanon?.delete(Number(userId));
+                            try { await closeBotLimitModal(userId); } catch (e) {}
+                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot. Usa el menú "🎲 Jugar" para continuar apostando', code: 'RESOLVED_ELSEWHERE' });
+                        }
+                    }
+                } catch (e) {}
                 // Marcar resuelto desde web por intersección
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
