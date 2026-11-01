@@ -3090,6 +3090,21 @@ app.post('/api/bets', async (req, res) => {
                 }
                 maxedFlow.dropped = [...numsBeforeClamp]
                     .filter(n => !clamped.items.some(it => String(betNumOf(it, betType)) === n));
+                // Re-validar límites contra BD actual (evita sobreapuesta si
+                // el bot registró directo mientras el modal de la web estaba abierto)
+                const limitCheckWeb = await checkExistingBetLimits({
+                    items: clamped.items,
+                    betType,
+                    sessionId,
+                    userId,
+                    maxCup: limitCheck.exceedData?.maxCup,
+                    maxUsd: limitCheck.exceedData?.maxUsd
+                });
+                if (!limitCheckWeb.ok) {
+                    try { await closeBotLimitModal(userId); } catch (e) {}
+                    try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
+                    return res.status(400).json({ error: `❌ ${limitCheckWeb.exceeders.join(', ')} ya están al monto máximo permitido. Tu jugada no se registró.` });
+                }
                 clampApplied = true;
                 clampedNums = exceededNumsInItems(parsed.items, betType, limitCheck.exceedData);
                 parsed.items = clamped.items;
