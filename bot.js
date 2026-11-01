@@ -3678,7 +3678,8 @@ bot.action('bet_override_accept', async (ctx) => {
             if (overrideCheck) {
                 const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                    && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
                     try { delete ctx.session.awaitingBet; } catch (e) {}
                     try { delete ctx.session.betType; } catch (e) {}
@@ -3691,7 +3692,7 @@ bot.action('bet_override_accept', async (ctx) => {
                 }
                 // Marcar como resuelto desde bot
                 try {
-                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, at: Date.now() });
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
                 } catch (e) {}
             }
         } catch (e) {}
@@ -3769,7 +3770,8 @@ bot.action('bet_override_reject', async (ctx) => {
             if (overrideCheck) {
                 const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                    && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
                     try { delete ctx.session.awaitingBet; } catch (e) {}
                     try { delete ctx.session.betType; } catch (e) {}
@@ -3781,7 +3783,7 @@ bot.action('bet_override_reject', async (ctx) => {
                     return;
                 }
                 try {
-                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, at: Date.now() });
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
                 } catch (e) {}
             }
         } catch (e) {}
@@ -3864,7 +3866,8 @@ bot.action('bet_maxed_accept', async (ctx) => {
             if (pendingCheck) {
                 const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                    && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.awaitingBet; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.betType; } catch (e) {}
@@ -3876,7 +3879,7 @@ bot.action('bet_maxed_accept', async (ctx) => {
                     return;
                 }
                 try {
-                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, at: Date.now() });
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}
             }
         } catch (e) {}
@@ -3959,7 +3962,8 @@ bot.action('bet_maxed_abort', async (ctx) => {
             if (pendingCheck) {
                 const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)) {
+                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                    && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.awaitingBet; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.betType; } catch (e) {}
@@ -3971,7 +3975,7 @@ bot.action('bet_maxed_abort', async (ctx) => {
                     return;
                 }
                 try {
-                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, at: Date.now() });
+                    if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}
             }
         } catch (e) {}
@@ -7850,7 +7854,8 @@ bot.on(message('text'), async (ctx) => {
                                 at: Date.now(),
                                 canon: Array.from(canonizeItemsSetBot(parsed.items, betType)),
                                 betType,
-                                sessionId: playSessionId
+                                sessionId: playSessionId,
+                                lottery: session.lottery || null
                             });
                         }
                     } catch (e) {}
@@ -7899,7 +7904,8 @@ bot.on(message('text'), async (ctx) => {
                                 at: Date.now(),
                                 canon: Array.from(canonizeItemsSetBot(parsed.items, betType)),
                                 betType,
-                                sessionId: playSessionId
+                                sessionId: playSessionId,
+                                lottery: session.lottery || null
                             });
                         }
                     } catch (e) {}

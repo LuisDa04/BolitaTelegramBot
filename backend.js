@@ -93,7 +93,7 @@ function setsIntersect(a, b) {
     return false;
 }
 
-async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betType = null) {
+async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betType = null, lottery = null) {
     try {
         const uidNum = Number(userId);
         if (!uidNum || !canonSet || canonSet.size === 0) return;
@@ -107,6 +107,9 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                     try {
                         const entryUid = Number(entry?.fromId || entry?.uid || key);
                         if (entryUid !== uidNum) continue;
+                        // Solo invalidar si es la misma lotería y mismo tipo de jugada
+                        if (lottery && entry.lottery && entry.lottery !== lottery) continue;
+                        if (betType && entry.betType && entry.betType !== betType) continue;
                         const entryCanon = entry?.canon ? new Set(entry.canon) : null;
                         if (!entryCanon || entryCanon.size === 0) continue;
                         if (setsIntersect(canonSet, entryCanon)) {
@@ -133,6 +136,9 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                     try {
                         const sess = botRef.localSession.getSession(cKey);
                         if (sess) {
+                            // Solo invalidar si es la misma lotería y mismo tipo de jugada
+                            if (lottery && sess.lottery && sess.lottery !== lottery) continue;
+                            if (betType && sess.betType && sess.betType !== betType) continue;
                             let changed = false;
                             if (sess.pendingBetOverride) {
                                 const sc = sess.pendingBetOverride?.canon ? new Set(sess.pendingBetOverride.canon) : canonizeItemsSet(sess.pendingBetOverride.items, sess.pendingBetOverride.betType || betType);
@@ -3114,8 +3120,8 @@ app.post('/api/bets', async (req, res) => {
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
-                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
-                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
                 try { await closeBotLimitModal(userId); } catch (e) {}
@@ -3123,8 +3129,8 @@ app.post('/api/bets', async (req, res) => {
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
-                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
-                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
                 return res.status(400).json({
@@ -3145,8 +3151,8 @@ app.post('/api/bets', async (req, res) => {
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
-                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
-                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
                 const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
@@ -3182,8 +3188,8 @@ app.post('/api/bets', async (req, res) => {
                 try {
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
-                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, at: Date.now() });
-                        await killBotPendingsByCanon(userId, cweb, sessionId, betType);
+                        global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
+                        await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
                 const omitted = omitExceededNumbers(parsed.items, betType, limitCheck.exceedData);
