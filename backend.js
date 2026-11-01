@@ -113,7 +113,7 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                             // Editar mensaje
                             try {
                                 if (botRef.telegram && entry.chatId && entry.messageId) {
-                                    await botRef.telegram.editMessageText(entry.chatId, entry.messageId, undefined, String.fromCharCode(10060) + ' Esta apuesta ya fue completada desde la Web-App.', { reply_markup: { inline_keyboard: [] } });
+                                    await botRef.telegram.editMessageText(entry.chatId, entry.messageId, undefined, String.fromCharCode(10060) + ' Esta jugada ya fue completada desde la Web-App. Usa el menú "🎲 Jugar" para continuar apostando', { reply_markup: { inline_keyboard: [] } });
                                 }
                             } catch (e) {}
                             botRef.pendingLimitModals.delete(key);
