@@ -3726,10 +3726,14 @@ bot.action('bet_override_accept', async (ctx) => {
             maxUsd: exceedData?.maxUsd
         });
         if (!limitCheckBot.ok) {
+            const nums = limitCheckBot.exceeders || [];
             const maxParts = [];
             if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
             if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
-            await safeEdit(ctx, `❌ ${limitCheckBot.exceeders.join(', ')} ya están al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
+            const isPlural = nums.length > 1;
+            const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+            const verb = isPlural ? 'están' : 'está';
+            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingBetOverride;
             try { await ctx.deleteMessage(); } catch (e) {}
             return;
@@ -3913,10 +3917,14 @@ bot.action('bet_maxed_accept', async (ctx) => {
             maxUsd: exceedData?.maxUsd
         });
         if (!limitCheckBot.ok) {
+            const nums = limitCheckBot.exceeders || [];
             const maxParts = [];
             if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
             if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
-            await safeEdit(ctx, `❌ ${limitCheckBot.exceeders.join(', ')} ya están al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
+            const isPlural = nums.length > 1;
+            const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+            const verb = isPlural ? 'están' : 'está';
+            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingMaxedOverride;
             try { await ctx.deleteMessage(); } catch (e) {}
             return;

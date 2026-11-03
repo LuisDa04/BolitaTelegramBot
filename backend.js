@@ -3121,7 +3121,11 @@ app.post('/api/bets', async (req, res) => {
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
-                    return res.status(400).json({ error: `❌ ${limitCheckWeb.exceeders.join(', ')} ya están al monto máximo permitido. Tu jugada no se registró.` });
+                    const nums = limitCheckWeb.exceeders || [];
+                    const isPlural = nums.length > 1;
+                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const verb = isPlural ? 'están' : 'está';
+                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
                 clampApplied = true;
                 clampedNums = exceededNumsInItems(parsed.items, betType, limitCheck.exceedData);
@@ -3198,7 +3202,11 @@ app.post('/api/bets', async (req, res) => {
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
-                    return res.status(400).json({ error: `❌ ${limitCheckWeb.exceeders.join(', ')} ya están al monto máximo permitido. Tu jugada no se registró.` });
+                    const nums = limitCheckWeb.exceeders || [];
+                    const isPlural = nums.length > 1;
+                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const verb = isPlural ? 'están' : 'está';
+                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
                 clampApplied = true;
                 clampedNums = exceededNumsInItems(parsed.items, betType, limitCheck.exceedData);
@@ -3278,7 +3286,11 @@ app.post('/api/bets', async (req, res) => {
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
-                    return res.status(400).json({ error: `❌ ${limitCheckWeb.exceeders.join(', ')} ya están al monto máximo permitido. Tu jugada no se registró.` });
+                    const nums = limitCheckWeb.exceeders || [];
+                    const isPlural = nums.length > 1;
+                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const verb = isPlural ? 'están' : 'está';
+                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
