@@ -3730,8 +3730,13 @@ bot.action('bet_override_accept', async (ctx) => {
             const maxParts = [];
             if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
             if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
+            const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
+            const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
+            const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
             const isPlural = nums.length > 1;
-            const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+            const subject = isPlural
+                ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
+                : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
             const verb = isPlural ? 'están' : 'está';
             await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingBetOverride;
@@ -3921,8 +3926,13 @@ bot.action('bet_maxed_accept', async (ctx) => {
             const maxParts = [];
             if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
             if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
+            const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
+            const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
+            const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
             const isPlural = nums.length > 1;
-            const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+            const subject = isPlural
+                ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
+                : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
             const verb = isPlural ? 'están' : 'está';
             await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingMaxedOverride;

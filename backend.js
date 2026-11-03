@@ -3122,8 +3122,13 @@ app.post('/api/bets', async (req, res) => {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                     const nums = limitCheckWeb.exceeders || [];
+                    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
+                    const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
+                    const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
                     const isPlural = nums.length > 1;
-                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const subject = isPlural
+                        ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
+                        : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
                     return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
@@ -3203,8 +3208,13 @@ app.post('/api/bets', async (req, res) => {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                     const nums = limitCheckWeb.exceeders || [];
+                    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
+                    const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
+                    const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
                     const isPlural = nums.length > 1;
-                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const subject = isPlural
+                        ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
+                        : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
                     return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
@@ -3287,8 +3297,13 @@ app.post('/api/bets', async (req, res) => {
                     try { await closeBotLimitModal(userId); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
                     const nums = limitCheckWeb.exceeders || [];
+                    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
+                    const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
+                    const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
                     const isPlural = nums.length > 1;
-                    const subject = isPlural ? `Los números ${nums.join(', ')}` : `El número ${nums[0]}`;
+                    const subject = isPlural
+                        ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
+                        : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
                     return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
