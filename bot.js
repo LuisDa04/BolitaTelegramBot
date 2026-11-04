@@ -3680,6 +3680,7 @@ bot.action('bet_override_accept', async (ctx) => {
                 const rw = global.resolvedWebCanon?.get(Number(uid));
                 if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
+                    try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
                     try { delete ctx.session.awaitingBet; } catch (e) {}
                     try { delete ctx.session.betType; } catch (e) {}
@@ -3690,6 +3691,7 @@ bot.action('bet_override_accept', async (ctx) => {
                     await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
+                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                 // Marcar como resuelto desde bot
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
@@ -3781,6 +3783,7 @@ bot.action('bet_override_reject', async (ctx) => {
                 const rw = global.resolvedWebCanon?.get(Number(uid));
                 if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
+                    try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
                     try { delete ctx.session.awaitingBet; } catch (e) {}
                     try { delete ctx.session.betType; } catch (e) {}
@@ -3791,6 +3794,7 @@ bot.action('bet_override_reject', async (ctx) => {
                     await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
+                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
                 } catch (e) {}
@@ -3877,6 +3881,7 @@ bot.action('bet_maxed_accept', async (ctx) => {
                 const rw = global.resolvedWebCanon?.get(Number(uid));
                 if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
+                    try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.awaitingBet; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.betType; } catch (e) {}
@@ -3887,6 +3892,7 @@ bot.action('bet_maxed_accept', async (ctx) => {
                     await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
+                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}
@@ -3982,6 +3988,7 @@ bot.action('bet_maxed_abort', async (ctx) => {
                 const rw = global.resolvedWebCanon?.get(Number(uid));
                 if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
+                    try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.awaitingBet; } catch (e) {}
                     try { if (ctx.session) delete ctx.session.betType; } catch (e) {}
@@ -3992,6 +3999,7 @@ bot.action('bet_maxed_abort', async (ctx) => {
                     await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
+                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}

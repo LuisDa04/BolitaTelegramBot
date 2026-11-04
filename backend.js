@@ -3139,6 +3139,7 @@ app.post('/api/bets', async (req, res) => {
                 totalUSD = clamped.totalUSD;
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
                 try {
+                    try { global.resolvedBotCanon?.delete(Number(userId)); } catch (e) {}
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
                         global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
@@ -3148,6 +3149,7 @@ app.post('/api/bets', async (req, res) => {
                 try { await closeBotLimitModal(userId); } catch (e) {}
             } else {
                 try {
+                    try { global.resolvedBotCanon?.delete(Number(userId)); } catch (e) {}
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
                         global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
@@ -3182,6 +3184,7 @@ app.post('/api/bets', async (req, res) => {
                 } catch (e) {}
                 // Marcar resuelto desde web por intersección y matar pendings del bot
                 try {
+                    try { global.resolvedBotCanon?.delete(Number(userId)); } catch (e) {}
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
                         global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
@@ -3240,6 +3243,7 @@ app.post('/api/bets', async (req, res) => {
                 } catch (e) {}
                 // Marcar resuelto desde web por intersección
                 try {
+                    try { global.resolvedBotCanon?.delete(Number(userId)); } catch (e) {}
                     const cweb = canonizeItemsSet(parsed.items, betType);
                     if (cweb.size > 0) {
                         global.resolvedWebCanon.set(Number(userId), { canonSet: cweb, betType, sessionId, lottery, at: Date.now() });
