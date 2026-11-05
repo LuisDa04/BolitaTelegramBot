@@ -3688,7 +3688,7 @@ bot.action('bet_override_accept', async (ctx) => {
                     try { delete ctx.session.sessionId; } catch (e) {}
                     try { await ctx.deleteMessage(); } catch (e) {}
                     try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
-                    await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
+                    await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
                 try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
@@ -3791,7 +3791,7 @@ bot.action('bet_override_reject', async (ctx) => {
                     try { delete ctx.session.sessionId; } catch (e) {}
                     try { await ctx.deleteMessage(); } catch (e) {}
                     try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
-                    await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
+                    await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
                 try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
@@ -3889,7 +3889,7 @@ bot.action('bet_maxed_accept', async (ctx) => {
                     try { if (ctx.session) delete ctx.session.sessionId; } catch (e) {}
                     try { await ctx.deleteMessage(); } catch (e) {}
                     try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
-                    await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
+                    await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
                 try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
@@ -3996,7 +3996,7 @@ bot.action('bet_maxed_abort', async (ctx) => {
                     try { if (ctx.session) delete ctx.session.sessionId; } catch (e) {}
                     try { await ctx.deleteMessage(); } catch (e) {}
                     try { if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid); } catch (e) {}
-                    await ctx.reply('❌ Esta jugada ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
+                    await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
                 try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}

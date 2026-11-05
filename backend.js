@@ -116,7 +116,7 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                             // Editar mensaje
                             try {
                                 if (botRef.telegram && entry.chatId && entry.messageId) {
-                                    await botRef.telegram.editMessageText(entry.chatId, entry.messageId, undefined, String.fromCharCode(10060) + ' Esta jugada ya fue completada desde la Web-App.', { reply_markup: { inline_keyboard: [] } });
+                                    await botRef.telegram.editMessageText(entry.chatId, entry.messageId, undefined, String.fromCharCode(10060) + ' Esta apuesta ya fue completada desde la Web-App.', { reply_markup: { inline_keyboard: [] } });
                                 }
                             } catch (e) {}
                             botRef.pendingLimitModals.delete(key);
@@ -3085,7 +3085,7 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                 } catch (e) {}
@@ -3178,7 +3178,7 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                 } catch (e) {}
@@ -3237,7 +3237,7 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta jugada ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                 } catch (e) {}
