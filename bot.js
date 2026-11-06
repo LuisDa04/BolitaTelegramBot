@@ -3729,9 +3729,6 @@ bot.action('bet_override_accept', async (ctx) => {
         });
         if (!limitCheckBot.ok) {
             const nums = limitCheckBot.exceeders || [];
-            const maxParts = [];
-            if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
-            if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
             const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
             const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
             const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
@@ -3740,7 +3737,7 @@ bot.action('bet_override_accept', async (ctx) => {
                 ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
                 : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
             const verb = isPlural ? 'están' : 'está';
-            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
+            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingBetOverride;
             try { await ctx.deleteMessage(); } catch (e) {}
             return;
@@ -3929,9 +3926,6 @@ bot.action('bet_maxed_accept', async (ctx) => {
         });
         if (!limitCheckBot.ok) {
             const nums = limitCheckBot.exceeders || [];
-            const maxParts = [];
-            if (limitCheckBot.maxCup !== null && limitCheckBot.maxCup !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxCup).toFixed(2)} CUP`);
-            if (limitCheckBot.maxUsd !== null && limitCheckBot.maxUsd !== undefined) maxParts.push(`${parseFloat(limitCheckBot.maxUsd).toFixed(2)} USD`);
             const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : (typeof formatBetTypeLabel === 'function' ? formatBetTypeLabel(betType).toLowerCase() : betType);
             const noun = typeNoun === 'centena' ? 'centena' : typeNoun === 'parle' ? 'parlet' : 'número';
             const nounPlural = noun === 'número' ? 'números' : noun === 'centena' ? 'centenas' : 'parlets';
@@ -3940,7 +3934,7 @@ bot.action('bet_maxed_accept', async (ctx) => {
                 ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
                 : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
             const verb = isPlural ? 'están' : 'está';
-            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido (${maxParts.join(' y ')}). Tu jugada no se registró.`, getMainKeyboard(ctx));
+            await safeEdit(ctx, `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.`, getMainKeyboard(ctx));
             if (ctx.session) delete ctx.session.pendingMaxedOverride;
             try { await ctx.deleteMessage(); } catch (e) {}
             return;
