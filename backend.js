@@ -108,8 +108,8 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                         const entryUid = Number(entry?.fromId || entry?.uid || key);
                         if (entryUid !== uidNum) continue;
                         // Solo invalidar si es la misma lotería y mismo tipo de jugada
-                        if (lottery && entry.lottery && entry.lottery !== lottery) continue;
-                        if (betType && entry.betType && entry.betType !== betType) continue;
+                        if (lottery && entry.lottery !== lottery) continue;
+                        if (betType && entry.betType !== betType) continue;
                         const entryCanon = entry?.canon ? new Set(entry.canon) : null;
                         if (!entryCanon || entryCanon.size === 0) continue;
                         if (setsIntersect(canonSet, entryCanon)) {
@@ -137,8 +137,8 @@ async function killBotPendingsByCanon(userId, canonSet, sessionId = null, betTyp
                         const sess = botRef.localSession.getSession(cKey);
                         if (sess) {
                             // Solo invalidar si es la misma lotería y mismo tipo de jugada
-                            if (lottery && sess.lottery && sess.lottery !== lottery) continue;
-                            if (betType && sess.betType && sess.betType !== betType) continue;
+                            if (lottery && sess.lottery !== lottery) continue;
+                            if (betType && sess.betType !== betType) continue;
                             let changed = false;
                             if (sess.pendingBetOverride) {
                                 const sc = sess.pendingBetOverride?.canon ? new Set(sess.pendingBetOverride.canon) : canonizeItemsSet(sess.pendingBetOverride.items, sess.pendingBetOverride.betType || betType);
