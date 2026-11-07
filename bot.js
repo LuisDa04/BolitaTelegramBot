@@ -3672,13 +3672,14 @@ bot.action('bet_override_accept', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
-        // Verificar intersección con resuelto desde web
+        // Verificar intersección con resuelto desde web (ignorando entradas stale > 5 min)
         try {
             const overrideCheck = ctx.session?.pendingBetOverride;
             if (overrideCheck) {
                 const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                const isStale = rw && (Date.now() - (rw.at || 0)) > 5 * 60 * 1000;
+                if (rw?.canonSet && !isStale && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
                     try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
@@ -3691,7 +3692,8 @@ bot.action('bet_override_accept', async (ctx) => {
                     await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
-                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
+                // Limpiar entrada stale si existe
+                if (isStale) { try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {} }
                 // Marcar como resuelto desde bot
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
@@ -3773,12 +3775,14 @@ bot.action('bet_override_reject', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        // Verificar intersección con resuelto desde web (ignorando entradas stale > 5 min)
         try {
             const overrideCheck = ctx.session?.pendingBetOverride;
             if (overrideCheck) {
                 const c = canonizeItemsSetBot(overrideCheck.items, overrideCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                const isStale = rw && (Date.now() - (rw.at || 0)) > 5 * 60 * 1000;
+                if (rw?.canonSet && !isStale && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === overrideCheck.lottery && rw.betType === overrideCheck.betType) {
                     try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { delete ctx.session.pendingBetOverride; } catch (e) {}
@@ -3791,7 +3795,8 @@ bot.action('bet_override_reject', async (ctx) => {
                     await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
-                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
+                // Limpiar entrada stale si existe
+                if (isStale) { try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {} }
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: overrideCheck.betType, sessionId: overrideCheck.sessionId, lottery: overrideCheck.lottery, at: Date.now() });
                 } catch (e) {}
@@ -3871,12 +3876,14 @@ bot.action('bet_maxed_accept', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        // Verificar intersección con resuelto desde web (ignorando entradas stale > 5 min)
         try {
             const pendingCheck = ctx.session?.pendingMaxedOverride;
             if (pendingCheck) {
                 const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                const isStale = rw && (Date.now() - (rw.at || 0)) > 5 * 60 * 1000;
+                if (rw?.canonSet && !isStale && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
                     try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
@@ -3889,7 +3896,8 @@ bot.action('bet_maxed_accept', async (ctx) => {
                     await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
-                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
+                // Limpiar entrada stale si existe
+                if (isStale) { try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {} }
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}
@@ -3975,12 +3983,14 @@ bot.action('bet_maxed_abort', async (ctx) => {
         await ctx.answerCbQuery().catch(() => {});
         const uid = ctx.from.id;
         if (bot.pendingLimitModals) bot.pendingLimitModals.delete(uid);
+        // Verificar intersección con resuelto desde web (ignorando entradas stale > 5 min)
         try {
             const pendingCheck = ctx.session?.pendingMaxedOverride;
             if (pendingCheck) {
                 const c = canonizeItemsSetBot(pendingCheck.items, pendingCheck.betType);
                 const rw = global.resolvedWebCanon?.get(Number(uid));
-                if (rw?.canonSet && setsIntersectBot(c, rw.canonSet)
+                const isStale = rw && (Date.now() - (rw.at || 0)) > 5 * 60 * 1000;
+                if (rw?.canonSet && !isStale && setsIntersectBot(c, rw.canonSet)
                     && rw.lottery === pendingCheck.lottery && rw.betType === pendingCheck.betType) {
                     try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
                     try { if (ctx.session) delete ctx.session.pendingMaxedOverride; } catch (e) {}
@@ -3993,7 +4003,9 @@ bot.action('bet_maxed_abort', async (ctx) => {
                     await ctx.reply('❌ Esta apuesta ya fue completada desde la Web-App.', getMainKeyboard(ctx)).catch(() => {});
                     return;
                 }
-                try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {}
+                // Limpiar entrada stale si existe (ya limpiado en check de conflicto si era stale)
+                if (isStale) { try { global.resolvedWebCanon?.delete(Number(uid)); } catch (e) {} }
+                // Para entradas fresh de otra lotería/tipo, no borrar (no es conflicto cruzado)
                 try {
                     if (global.resolvedBotCanon) global.resolvedBotCanon.set(Number(uid), { canonSet: c, betType: pendingCheck.betType, sessionId: pendingCheck.sessionId, lottery: pendingCheck.lottery, at: Date.now() });
                 } catch (e) {}
