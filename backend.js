@@ -3114,15 +3114,22 @@ app.post('/api/bets', async (req, res) => {
                 // justo el monto que la jugada ya tenía (se conserva su wager); el
                 // número solo desaparece cuando OTRAS jugadas tenían el tope
                 // entero, en cuyo caso el recorte lo deja en 0 y lo descarta.
+                // Re-validar límites contra BD actual antes de recortar (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
                 const numsBeforeClamp = new Set(parsed.items.map(it => String(betNumOf(it, betType))));
-                const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
+                const clamped = clampItemsToMax(parsed.items, betType, freshLimitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
                     // Red de seguridad: el atajo de arriba ya corta este caso
                     // antes de ofrecer el modal. Si aun así se llegara aquí, la
                     // apuesta NO se toca (aún no se reembolsó nada): solo avisar.
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
                     return res.status(400).json({
-                        error: maxedNoticeBlock(betType, maxedOverall, limitCheck.exceedData),
+                        error: maxedNoticeBlock(betType, maxedOverall, freshLimitCheck.exceedData),
                         code: 'EDIT_NOTHING_TO_APPLY'
                     });
                 }
@@ -3135,8 +3142,8 @@ app.post('/api/bets', async (req, res) => {
                     betType,
                     sessionId,
                     userId,
-                    maxCup: limitCheck.exceedData?.maxCup,
-                    maxUsd: limitCheck.exceedData?.maxUsd
+                    maxCup: freshLimitCheck.exceedData?.maxCup,
+                    maxUsd: freshLimitCheck.exceedData?.maxUsd
                 });
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
@@ -3153,7 +3160,7 @@ app.post('/api/bets', async (req, res) => {
                     return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
                 clampApplied = true;
-                clampedNums = exceededNumsInItems(parsed.items, betType, limitCheck.exceedData);
+                clampedNums = exceededNumsInItems(parsed.items, betType, freshLimitCheck.exceedData);
                 parsed.items = clamped.items;
                 totalCUP = clamped.totalCUP;
                 totalUSD = clamped.totalUSD;
@@ -3214,7 +3221,14 @@ app.post('/api/bets', async (req, res) => {
                         await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
-                const clamped = clampItemsToMax(parsed.items, betType, limitCheck.exceedData);
+                // Re-validar límites contra BD actual antes de recortar (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
+                const clamped = clampItemsToMax(parsed.items, betType, freshLimitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
                     try { global.resolvedWebCanon?.delete(Number(userId)); } catch (e) {}
@@ -3227,8 +3241,8 @@ app.post('/api/bets', async (req, res) => {
                     betType,
                     sessionId,
                     userId,
-                    maxCup: limitCheck.exceedData?.maxCup,
-                    maxUsd: limitCheck.exceedData?.maxUsd
+                    maxCup: freshLimitCheck.exceedData?.maxCup,
+                    maxUsd: freshLimitCheck.exceedData?.maxUsd
                 });
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
@@ -3245,7 +3259,7 @@ app.post('/api/bets', async (req, res) => {
                     return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
                 }
                 clampApplied = true;
-                clampedNums = exceededNumsInItems(parsed.items, betType, limitCheck.exceedData);
+                clampedNums = exceededNumsInItems(parsed.items, betType, freshLimitCheck.exceedData);
                 parsed.items = clamped.items;
                 totalCUP = clamped.totalCUP;
                 totalUSD = clamped.totalUSD;
@@ -3276,7 +3290,14 @@ app.post('/api/bets', async (req, res) => {
                         await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
-                const omitted = omitExceededNumbers(parsed.items, betType, limitCheck.exceedData);
+                // Re-validar límites contra BD actual antes de omitir (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
+                const omitted = omitExceededNumbers(parsed.items, betType, freshLimitCheck.exceedData);
                 omittedNums = [...new Set(omitted.omittedItems.map(it => String(betNumOf(it, betType))))];
                 if (omitted.totalCUP <= 0 && omitted.totalUSD <= 0) {
                     const isCentena = betType === 'centena';
@@ -3320,8 +3341,8 @@ app.post('/api/bets', async (req, res) => {
                     betType,
                     sessionId,
                     userId,
-                    maxCup: limitCheck.exceedData?.maxCup,
-                    maxUsd: limitCheck.exceedData?.maxUsd
+                    maxCup: freshLimitCheck.exceedData?.maxCup,
+                    maxUsd: freshLimitCheck.exceedData?.maxUsd
                 });
                 if (!limitCheckWeb.ok) {
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
