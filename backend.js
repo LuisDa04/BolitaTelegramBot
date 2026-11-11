@@ -1825,6 +1825,63 @@ function maxedNoticeBlock(betType, maxed, exceedData) {
     return `❌ ${sentences.join(' ')}`;
 }
 
+// ========== HELPER: Mensaje específico para resolución cruzada Bot → Web ==========
+// Construye "❌ El/La [tipo] XX ya fue/fueron apostado/a a su máximo permitido de X.XX [CUP/USD]."
+// usando los números que intersectan entre la apuesta de la web y el canon resuelto por el bot.
+function buildCrossResolvedMessageBotWeb(items, betType, exceedData, botCanonSet) {
+    if (!items || !exceedData || !botCanonSet || botCanonSet.size === 0) {
+        return '❌ Esta apuesta ya fue completada desde el Bot.';
+    }
+
+    const typeNoun = (betType === 'fijo' || betType === 'corridos') ? 'número' : formatBetTypeLabel(betType).toLowerCase();
+    const nounPlural = typeNoun === 'número' ? 'números' : typeNoun === 'centena' ? 'centenas' : `${typeNoun}s`;
+
+    const canonOf = (item) => betType === 'parle' ? (normalizeParleValue(item.numero) || item.numero) : item.numero;
+
+    const cupNums = new Set();
+    const usdNums = new Set();
+    for (const item of items) {
+        const canon = String(canonOf(item));
+        if (!botCanonSet.has(canon)) continue;
+        const itemCup = item.cup !== undefined ? parseFloat(item.cup) : (item.currency === 'CUP' ? parseFloat(item.amount) : 0);
+        const itemUsd = item.usd !== undefined ? parseFloat(item.usd) : (item.currency === 'USD' ? parseFloat(item.amount) : 0);
+        if (itemCup > 0) cupNums.add(canon);
+        if (itemUsd > 0) usdNums.add(canon);
+    }
+
+    const sortNums = (nums) => [...nums].sort((a, b) => {
+        const na = parseInt(a, 10), nb = parseInt(b, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return String(a).localeCompare(String(b));
+    });
+
+    const sentenceFor = (nums, max, currency) => {
+        const list = sortNums(nums);
+        if (list.length === 0) return null;
+        const isPlural = list.length > 1;
+        const subject = isPlural
+            ? `${typeNoun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${joinListWithY(list)}`
+            : `${typeNoun === 'centena' ? 'La' : 'El'} ${typeNoun} ${list[0]}`;
+        const verb = isPlural ? 'fueron' : 'fue';
+        const participle = isPlural
+            ? `${typeNoun === 'centena' ? 'apostadas' : 'apostados'}`
+            : `${typeNoun === 'centena' ? 'apostada' : 'apostado'}`;
+        return `${subject} ya ${verb} ${participle} a su máximo permitido de ${parseFloat(max).toFixed(2)} ${currency}.`;
+    };
+
+    const sentences = [];
+    if (exceedData.maxCup !== null && exceedData.maxCup !== undefined && cupNums.size > 0) {
+        const s = sentenceFor(cupNums, exceedData.maxCup, 'CUP');
+        if (s) sentences.push(s);
+    }
+    if (exceedData.maxUsd !== null && exceedData.maxUsd !== undefined && usdNums.size > 0) {
+        const s = sentenceFor(usdNums, exceedData.maxUsd, 'USD');
+        if (s) sentences.push(s);
+    }
+
+    return sentences.length > 0 ? `❌ ${sentences.join(' ')}` : '❌ Esta apuesta ya fue completada desde el Bot.';
+}
+
 // ========== FUNCIONES DE PARSEO DE APUESTAS ==========
 // Devuelve {items, ok}. ok=false si algún token de la línea no corresponde al
 // tipo de apuesta seleccionado (no se descarta en silencio).
@@ -3103,7 +3160,8 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
+                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
@@ -3206,7 +3264,8 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
+                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
@@ -3275,7 +3334,8 @@ app.post('/api/bets', async (req, res) => {
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
                             global.resolvedBotCanon?.delete(Number(userId));
                             try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            return res.status(400).json({ error: '❌ Esta apuesta ya fue completada desde el Bot.', code: 'RESOLVED_ELSEWHERE' });
+                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
+                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
