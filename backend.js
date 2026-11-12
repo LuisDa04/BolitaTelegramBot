@@ -3151,17 +3151,30 @@ app.post('/api/bets', async (req, res) => {
         if (isMaxedFlow) {
             maxedFlow = maxedOverall;
             if (req.body.confirmLimitOverride === true) {
-                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min
+                // Re-validar límites contra BD actual antes de recortar (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min.
+                // Solo se devuelve RESOLVED_ELSEFOREWHERE si el número sigue excediendo con datos frescos;
+                // si el bot dejó cupo libre, la web puede seguir con el recorte.
                 try {
                     const rb = global.resolvedBotCanon?.get(Number(userId));
                     const isStale = rb && (Date.now() - (rb.at || 0)) > 5 * 60 * 1000;
                     if (rb?.canonSet && !isStale && rb.lottery === lottery && rb.betType === betType) {
                         const cwebCheck = canonizeItemsSet(parsed.items, betType);
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            if (!freshLimitCheck.ok) {
+                                global.resolvedBotCanon?.delete(Number(userId));
+                                try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
+                                const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, freshLimitCheck.exceedData, rb.canonSet);
+                                return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEFOREWHERE' });
+                            }
+                            // El bot dejó cupo libre: permitir que la web continúe con el recorte
                             global.resolvedBotCanon?.delete(Number(userId));
-                            try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
-                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
@@ -3172,13 +3185,6 @@ app.post('/api/bets', async (req, res) => {
                 // justo el monto que la jugada ya tenía (se conserva su wager); el
                 // número solo desaparece cuando OTRAS jugadas tenían el tope
                 // entero, en cuyo caso el recorte lo deja en 0 y lo descarta.
-                // Re-validar límites contra BD actual antes de recortar (evita usar
-                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
-                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
-                    userId,
-                    sessionId: sessionId || null,
-                    excludeBetId: betId || null
-                });
                 const numsBeforeClamp = new Set(parsed.items.map(it => String(betNumOf(it, betType))));
                 const clamped = clampItemsToMax(parsed.items, betType, freshLimitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
@@ -3255,17 +3261,30 @@ app.post('/api/bets', async (req, res) => {
             // Llega también en edición, cuando no hay ningún número ya apostado al
             // máximo y por eso no se pregunta con el aviso ⚠️ de arriba.
             if (req.body.confirmLimitOverride === true) {
-                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min
+                // Re-validar límites contra BD actual antes de recortar (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min.
+                // Solo se devuelve RESOLVED_ELSEFOREWHERE si el número sigue excediendo con datos frescos;
+                // si el bot dejó cupo libre, la web puede seguir con el recorte.
                 try {
                     const rb = global.resolvedBotCanon?.get(Number(userId));
                     const isStale = rb && (Date.now() - (rb.at || 0)) > 5 * 60 * 1000;
                     if (rb?.canonSet && !isStale && rb.lottery === lottery && rb.betType === betType) {
                         const cwebCheck = canonizeItemsSet(parsed.items, betType);
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            if (!freshLimitCheck.ok) {
+                                global.resolvedBotCanon?.delete(Number(userId));
+                                try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
+                                const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, freshLimitCheck.exceedData, rb.canonSet);
+                                return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEFOREWHERE' });
+                            }
+                            // El bot dejó cupo libre: permitir que la web continúe con el recorte
                             global.resolvedBotCanon?.delete(Number(userId));
-                            try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
-                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
@@ -3280,13 +3299,6 @@ app.post('/api/bets', async (req, res) => {
                         await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
-                // Re-validar límites contra BD actual antes de recortar (evita usar
-                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
-                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
-                    userId,
-                    sessionId: sessionId || null,
-                    excludeBetId: betId || null
-                });
                 const clamped = clampItemsToMax(parsed.items, betType, freshLimitCheck.exceedData);
                 if (clamped.totalCUP <= 0 && clamped.totalUSD <= 0) {
                     try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
@@ -3325,17 +3337,30 @@ app.post('/api/bets', async (req, res) => {
                 effectiveRawText = serializeItemsToText(parsed.items, betType);
                 try { await closeBotLimitModal(userId, { lottery, betType, canonSet: canonizeItemsSet(parsed.items, betType) }); } catch (e) {}
             } else if (req.body.omitLimitOverride === true) {
-                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min
+                // Re-validar límites contra BD actual antes de omitir (evita usar
+                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
+                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
+                    userId,
+                    sessionId: sessionId || null,
+                    excludeBetId: betId || null
+                });
+                // Verificar si el bot ya resolvió esta jugada primero (Bot → Web), ignorando stale > 5 min.
+                // Solo se devuelve RESOLVED_ELSEFOREWHERE si el número sigue excediendo con datos frescos;
+                // si el bot dejó cupo libre, la web puede seguir con el recorte.
                 try {
                     const rb = global.resolvedBotCanon?.get(Number(userId));
                     const isStale = rb && (Date.now() - (rb.at || 0)) > 5 * 60 * 1000;
                     if (rb?.canonSet && !isStale && rb.lottery === lottery && rb.betType === betType) {
                         const cwebCheck = canonizeItemsSet(parsed.items, betType);
                         if (setsIntersect(cwebCheck, rb.canonSet)) {
+                            if (!freshLimitCheck.ok) {
+                                global.resolvedBotCanon?.delete(Number(userId));
+                                try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
+                                const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, freshLimitCheck.exceedData, rb.canonSet);
+                                return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEFOREWHERE' });
+                            }
+                            // El bot dejó cupo libre: permitir que la web continúe con el recorte
                             global.resolvedBotCanon?.delete(Number(userId));
-                            try { await closeBotLimitModal(userId, { lottery, betType, canonSet: cwebCheck }); } catch (e) {}
-                            const msg = buildCrossResolvedMessageBotWeb(parsed.items, betType, limitCheck.exceedData, rb.canonSet);
-                            return res.status(400).json({ error: msg, code: 'RESOLVED_ELSEWHERE' });
                         }
                     }
                     // Limpiar entrada stale si existe
@@ -3350,13 +3375,6 @@ app.post('/api/bets', async (req, res) => {
                         await killBotPendingsByCanon(userId, cweb, sessionId, betType, lottery);
                     }
                 } catch (e) {}
-                // Re-validar límites contra BD actual antes de omitir (evita usar
-                // otrosTotals obsoletos si el bot apostó mientras el modal de la web estaba abierto)
-                const freshLimitCheck = await validateBetLimits(parsed.items, betType, priceData, {
-                    userId,
-                    sessionId: sessionId || null,
-                    excludeBetId: betId || null
-                });
                 const omitted = omitExceededNumbers(parsed.items, betType, freshLimitCheck.exceedData);
                 omittedNums = [...new Set(omitted.omittedItems.map(it => String(betNumOf(it, betType))))];
                 if (omitted.totalCUP <= 0 && omitted.totalUSD <= 0) {
