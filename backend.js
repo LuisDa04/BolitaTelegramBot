@@ -1874,6 +1874,17 @@ function maxedNoticeBlock(betType, maxed, exceedData) {
     return `❌ ${sentences.join(' ')}`;
 }
 
+// Aviso ❌ de "ya apostado a su máximo" a partir de un `exceedData` FRESCO
+// (recién leído de BD). Devuelve null si ningún número quedó realmente en su
+// tope —p. ej. solo excede pero aún tiene cupo—, para que el llamador use el
+// mensaje genérico. Espejo del helper de bot.js.
+function maxedBlockFromExceedData(betType, exceedData) {
+    if (!exceedData) return null;
+    const maxed = maxedExceeders(exceedData, null);
+    if (maxed.cup.length === 0 && maxed.usd.length === 0) return null;
+    return maxedNoticeBlock(betType, maxed, exceedData);
+}
+
 // ========== HELPER: Mensaje específico para resolución cruzada Bot → Web ==========
 // Construye "❌ El/La [tipo] XX ya fue/fueron apostado/a a su máximo permitido de X.XX [CUP/USD]."
 // usando los números que intersectan entre la apuesta de la web y el canon resuelto por el bot.
@@ -3271,7 +3282,11 @@ app.post('/api/bets', async (req, res) => {
                         ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
                         : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
-                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
+                    const genericMsg = `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.`;
+                    // Si el bot consumió el cupo mientras el modal estaba abierto,
+                    // avisar con el monto y la moneda reales del tope consumido.
+                    const maxedMsg = maxedBlockFromExceedData(betType, freshLimitCheck?.exceedData);
+                    return res.status(400).json({ error: maxedMsg || genericMsg });
                 }
                 // Si el usuario venía del modal clásico (trae `expected*`) y el
                 // monto admisible cambió mientras estaba abierto, reabrir ese
@@ -3376,7 +3391,11 @@ app.post('/api/bets', async (req, res) => {
                         ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
                         : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
-                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
+                    const genericMsg = `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.`;
+                    // Si el bot consumió el cupo mientras el modal estaba abierto,
+                    // avisar con el monto y la moneda reales del tope consumido.
+                    const maxedMsg = maxedBlockFromExceedData(betType, freshLimitCheck?.exceedData);
+                    return res.status(400).json({ error: maxedMsg || genericMsg });
                 }
                 // El usuario confirmó un monto admisible concreto en el modal.
                 // Si mientras estaba abierto otra vía (p. ej. el bot) consumió
@@ -3499,7 +3518,11 @@ app.post('/api/bets', async (req, res) => {
                         ? `${noun === 'centena' ? 'Las' : 'Los'} ${nounPlural} ${nums.join(', ')}`
                         : `${noun === 'centena' ? 'La' : 'El'} ${noun} ${nums[0]}`;
                     const verb = isPlural ? 'están' : 'está';
-                    return res.status(400).json({ error: `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.` });
+                    const genericMsg = `❌ ${subject} ya ${verb} al monto máximo permitido. Tu jugada no se registró.`;
+                    // Si el bot consumió el cupo mientras el modal estaba abierto,
+                    // avisar con el monto y la moneda reales del tope consumido.
+                    const maxedMsg = maxedBlockFromExceedData(betType, freshLimitCheck?.exceedData);
+                    return res.status(400).json({ error: maxedMsg || genericMsg });
                 }
                 parsed.items = omitted.items;
                 totalCUP = omitted.totalCUP;
