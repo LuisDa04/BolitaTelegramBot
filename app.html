@@ -1706,14 +1706,27 @@ Varios por línea: 17x32 17x62 32x62 con 3 CUP<br>`;
         function rejectLimitOverride() {
             document.getElementById('limitOverrideModal').classList.add('hidden');
             const payload = pendingBetPayload;
+            const shown = pendingLimitExceedData;
             pendingBetPayload = null;
             pendingLimitExceedData = null;
             if (!payload) return;
             payload.omitLimitOverride = true;
             delete payload.confirmLimitOverride;
-            delete payload.expectedAdmissibleLines;
-            delete payload.expectedAdmissibleCup;
-            delete payload.expectedAdmissibleUsd;
+            // Enviar lo que el usuario vio en el modal (igual que "Sí, apostar")
+            // para que el backend detecte si el monto admisible cambió mientras
+            // el modal estaba abierto (p. ej. el bot apostó más al mismo número).
+            if (shown) {
+                if (Array.isArray(shown.admissibleLines)) payload.expectedAdmissibleLines = shown.admissibleLines;
+                else delete payload.expectedAdmissibleLines;
+                if (typeof shown.admissibleCup === 'number') payload.expectedAdmissibleCup = shown.admissibleCup;
+                else delete payload.expectedAdmissibleCup;
+                if (typeof shown.admissibleUsd === 'number') payload.expectedAdmissibleUsd = shown.admissibleUsd;
+                else delete payload.expectedAdmissibleUsd;
+            } else {
+                delete payload.expectedAdmissibleLines;
+                delete payload.expectedAdmissibleCup;
+                delete payload.expectedAdmissibleUsd;
+            }
             sendBetRequest(payload);
         }
         window.acceptLimitOverride = acceptLimitOverride;
